@@ -1,9 +1,14 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
-import 'screens/partners/partners_list_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:mvp_social_quest/screens/auth/welcome_page.dart';
+import 'screens/home_page.dart';
+import 'firebase_options.dart'; // auto-généré
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -25,7 +30,7 @@ class MyApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const PartnersListPage(),
+      home: const WelcomePage(),
     );
   }
 }

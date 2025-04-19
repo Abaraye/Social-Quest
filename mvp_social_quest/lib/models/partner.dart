@@ -19,6 +19,33 @@ class Partner {
     required this.longitude,
   });
 
+  factory Partner.fromMap(Map<String, dynamic> data, String id) {
+    return Partner(
+      id: id,
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      category: data['category'] ?? '',
+      slots: Map<String, List<String>>.from(
+        (data['slots'] ?? {}).map(
+          (key, value) => MapEntry(key, List<String>.from(value)),
+        ),
+      ),
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description,
+      'category': category,
+      'slots': slots,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+
   int get maxReduction {
     final regex = RegExp(r'(\d+)%');
     int max = 0;
@@ -49,10 +76,11 @@ class Partner {
     id: json['id'],
     name: json['name'],
     description: json['description'],
-    slots: {}, // Les slots ne sont pas restaurés ici (hors portée MVP)
     category: json['category'],
-    latitude: json['latitude'],
-    longitude: json['longitude'],
+    slots:
+        {}, // Slots non inclus pour simplification (hors scope du JSON basique)
+    latitude: (json['latitude'] ?? 0.0).toDouble(),
+    longitude: (json['longitude'] ?? 0.0).toDouble(),
   );
 
   @override

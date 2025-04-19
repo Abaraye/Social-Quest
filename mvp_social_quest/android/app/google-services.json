@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "326489596162",
+    "project_id": "red-uc-7afda",
+    "storage_bucket": "red-uc-7afda.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:326489596162:android:641f6274530633e724621b",
+        "android_client_info": {
+          "package_name": "com.example.mvp_social_quest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnntEB1EmgfIe-OkhSY_sqeo0wC1mFkMg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
