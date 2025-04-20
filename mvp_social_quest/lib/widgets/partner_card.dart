@@ -1,13 +1,13 @@
-// lib/widgets/partner_card.dart
-
 import 'package:flutter/material.dart';
 import '../models/partner.dart';
 
+/// 🔹 Carte UI représentant un partenaire/activité
+/// Utilisée dans la liste des partenaires, favoris, etc.
 class PartnerCard extends StatelessWidget {
-  final Partner partner;
-  final bool isFavorite;
-  final VoidCallback onFavoriteToggle;
-  final VoidCallback onTap;
+  final Partner partner; // Le modèle de l'activité
+  final bool isFavorite; // L'état actuel du favori
+  final VoidCallback onFavoriteToggle; // Callback pour gérer le favori
+  final VoidCallback onTap; // Callback pour ouvrir les détails
 
   const PartnerCard({
     super.key,
@@ -17,6 +17,7 @@ class PartnerCard extends StatelessWidget {
     required this.onTap,
   });
 
+  /// 🎯 Emoji associé à chaque catégorie
   String _categoryEmoji(String category) {
     switch (category.toLowerCase()) {
       case 'cuisine':
@@ -29,6 +30,10 @@ class PartnerCard extends StatelessWidget {
         return '🎲';
       case 'bien-être':
         return '🧘';
+      case 'musique':
+        return '🎵';
+      case 'détente':
+        return '🛀';
       default:
         return '🎯';
     }
@@ -48,6 +53,7 @@ class PartnerCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 🔹 Titre et bouton favori
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -69,11 +75,15 @@ class PartnerCard extends StatelessWidget {
                   ),
                 ],
               ),
+
               const SizedBox(height: 8),
+
+              // 🔹 Tags (catégorie, réduction...)
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
+                  // 🏷 Catégorie
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -92,7 +102,9 @@ class PartnerCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (partner.maxReduction > 0)
+
+                  // 🔥 Réduction max
+                  if (partner.maxReductionDisplay > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -103,7 +115,7 @@ class PartnerCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '🔥 Jusqu’à -${partner.maxReduction}%',
+                        '🔥 Jusqu’à -${partner.maxReductionDisplay}%',
                         style: TextStyle(
                           color: Colors.orange.shade800,
                           fontSize: 12,
@@ -113,9 +125,14 @@ class PartnerCard extends StatelessWidget {
                     ),
                 ],
               ),
+
               const SizedBox(height: 8),
+
+              // 🔹 Description
               Text(
                 partner.description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 14, color: Colors.black87),
               ),
             ],

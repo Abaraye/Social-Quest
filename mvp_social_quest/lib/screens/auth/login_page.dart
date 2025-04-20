@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../home_page.dart';
+import '../home/home_page.dart';
 
+/// 🧭 Page de connexion simple, non Stateful (StatelessWidget)
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // ⚠️ Ces contrôleurs sont recréés à chaque rebuild (non optimal)
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
 
@@ -24,18 +26,26 @@ class LoginPage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
+
+              // 🔑 Email
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Adresse email'),
               ),
+
               const SizedBox(height: 16),
+
+              // 🔒 Mot de passe
               TextField(
                 controller: passwordController,
                 obscureText: true,
                 decoration: const InputDecoration(labelText: 'Mot de passe'),
               ),
+
               const SizedBox(height: 24),
+
+              // 🔘 Bouton de connexion
               ElevatedButton(
                 onPressed: () async {
                   final email = emailController.text.trim();

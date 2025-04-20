@@ -1,13 +1,12 @@
-// lib/models/partner.dart
-
 class Partner {
   final String id;
   final String name;
   final String description;
-  final Map<String, List<String>> slots;
+  final Map<String, List<Map<String, dynamic>>> slots;
   final String category;
   final double latitude;
   final double longitude;
+  final int? maxReduction; // ← optionnel : peut être calculé ou défini
 
   Partner({
     required this.id,
@@ -17,72 +16,86 @@ class Partner {
     required this.category,
     required this.latitude,
     required this.longitude,
+    this.maxReduction,
   });
 
+  /// 🔄 Conversion depuis un format JSON (ex: stockage local, SharedPreferences)
+  factory Partner.fromJson(Map<String, dynamic> json) {
+    return Partner(
+      id: json['id'],
+      name: json['name'],
+      description: json['description'],
+      category: json['category'],
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      maxReduction: json['maxReduction'],
+      slots: {}, // ⚠️ Les slots ne sont pas chargés pour les favoris
+    );
+  }
+
+  /// 🔄 Conversion vers un JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'category': category,
+      'latitude': latitude,
+      'longitude': longitude,
+      'maxReduction': maxReduction,
+    };
+  }
+
+  /// 🔄 Construction depuis une Map Firestore + id
   factory Partner.fromMap(Map<String, dynamic> data, String id) {
+    final rawSlots = data['slots'] ?? {};
+    final parsedSlots = <String, List<Map<String, dynamic>>>{};
+
+    for (final entry in rawSlots.entries) {
+      parsedSlots[entry.key] = List<Map<String, dynamic>>.from(
+        entry.value ?? [],
+      );
+    }
+
     return Partner(
       id: id,
       name: data['name'] ?? '',
       description: data['description'] ?? '',
       category: data['category'] ?? '',
-      slots: Map<String, List<String>>.from(
-        (data['slots'] ?? {}).map(
-          (key, value) => MapEntry(key, List<String>.from(value)),
-        ),
-      ),
       latitude: (data['latitude'] ?? 0.0).toDouble(),
       longitude: (data['longitude'] ?? 0.0).toDouble(),
+      slots: parsedSlots,
+      maxReduction: data['maxReduction'],
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'description': description,
-      'category': category,
-      'slots': slots,
-      'latitude': latitude,
-      'longitude': longitude,
-    };
-  }
-
-  int get maxReduction {
-    final regex = RegExp(r'(\d+)%');
+  /// 🧠 Calcul de la plus grosse réduction dans les créneaux
+  int get computedMaxReduction {
     int max = 0;
-    for (var slotReductions in slots.values) {
-      for (var reduction in slotReductions) {
-        final match = regex.firstMatch(reduction);
-        if (match != null) {
-          final value = int.tryParse(match.group(1)!);
-          if (value != null && value > max) {
-            max = value;
-          }
-        }
+    for (final reductions in slots.values) {
+      for (final reduction in reductions) {
+        final val = reduction['amount'];
+        if (val is int && val > max) max = val;
       }
     }
     return max;
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
+  /// 🔁 Conversion vers une Map Firestore (utile pour update)
+  Map<String, dynamic> toMap() => {
     'name': name,
     'description': description,
     'category': category,
     'latitude': latitude,
     'longitude': longitude,
+    'slots': slots,
+    'maxReduction': maxReduction ?? computedMaxReduction,
   };
 
-  factory Partner.fromJson(Map<String, dynamic> json) => Partner(
-    id: json['id'],
-    name: json['name'],
-    description: json['description'],
-    category: json['category'],
-    slots:
-        {}, // Slots non inclus pour simplification (hors scope du JSON basique)
-    latitude: (json['latitude'] ?? 0.0).toDouble(),
-    longitude: (json['longitude'] ?? 0.0).toDouble(),
-  );
+  /// 🖼 Valeur à afficher dans les cards
+  int get maxReductionDisplay => maxReduction ?? computedMaxReduction;
 
+  /// 🔁 Égalité personnalisée pour pouvoir gérer les favoris
   @override
   bool operator ==(Object other) =>
       identical(this, other) || (other is Partner && other.id == id);

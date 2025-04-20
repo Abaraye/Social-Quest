@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mvp_social_quest/screens/auth/welcome_page.dart';
-import 'package:mvp_social_quest/screens/reservations_page.dart';
-import '../services/auth_service.dart';
-import 'auth/login_page.dart';
-import 'auth/signup_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:mvp_social_quest/screens/auth/welcome_page.dart';
+import 'package:mvp_social_quest/screens/home/reservations_page.dart';
+import 'package:mvp_social_quest/screens/auth/login_page.dart';
+import 'package:mvp_social_quest/screens/auth/user_type_selector.dart';
+
+import '../../services/auth_service.dart';
+
+/// Page profil — affiche les infos utilisateur ou propose de se connecter/s'inscrire.
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -13,8 +17,8 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    // 🔹 Si l’utilisateur n’est pas connecté
     if (user == null) {
-      // Affichage simplifié de l'accueil (sans redirection)
       return Scaffold(
         appBar: AppBar(
           title: const Text("Mon profil"),
@@ -33,15 +37,11 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const UserTypeSelectorPage(),
                     ),
-                    builder: (_) => const SignUpPage(),
                   );
                 },
                 style: ElevatedButton.styleFrom(
@@ -78,7 +78,7 @@ class ProfilePage extends StatelessWidget {
       );
     }
 
-    // Affichage normal du profil si connecté
+    // 🔹 Si l’utilisateur est connecté
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon profil'),
@@ -90,6 +90,8 @@ class ProfilePage extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 16),
+
+            // Avatar utilisateur
             CircleAvatar(
               radius: 40,
               backgroundColor: Colors.deepPurple.shade100,
@@ -100,11 +102,16 @@ class ProfilePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
+
+            // Email affiché
             Text(
               user.email ?? 'Utilisateur inconnu',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
+
             const SizedBox(height: 24),
+
+            // Carte des options de profil
             Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -137,22 +144,22 @@ class ProfilePage extends StatelessWidget {
                     leading: const Icon(Icons.history),
                     title: const Text('Mes réservations'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () async {
-                      if (context.mounted) {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ReservationsPage(),
-                          ),
-                          (route) => false,
-                        );
-                      }
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ReservationsPage(),
+                        ),
+                      );
                     },
                   ),
                 ],
               ),
             ),
+
             const Spacer(),
+
+            // 🔴 Bouton de déconnexion
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -169,7 +176,6 @@ class ProfilePage extends StatelessWidget {
                     );
                   }
                 },
-
                 icon: const Icon(Icons.power, color: Colors.white),
                 label: const Text(
                   'Se déconnecter',

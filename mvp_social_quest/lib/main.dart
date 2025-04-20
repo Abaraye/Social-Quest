@@ -2,13 +2,17 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:mvp_social_quest/screens/auth/welcome_page.dart';
-import 'screens/home_page.dart';
-import 'firebase_options.dart'; // auto-généré
+import 'firebase_options.dart'; // 🛠 Config auto-générée pour Firebase
+import 'screens/auth/welcome_page.dart';
+import 'screens/home/home_page.dart'; // 🔄 Sera utilisé plus tard si l’utilisateur est déjà connecté
 
 void main() async {
+  // ✅ Obligatoire pour utiliser Firebase avant le lancement complet de l'app
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 Initialisation Firebase avec les options selon la plateforme
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const MyApp());
 }
 
@@ -20,6 +24,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Social Quest',
       debugShowCheckedModeBanner: false,
+
+      // 🎨 Thème global : couleur, typographie, AppBar, etc.
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
         useMaterial3: true,
@@ -30,6 +36,8 @@ class MyApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
+
+      // 🏠 Page d’accueil (non-connecté)
       home: const WelcomePage(),
     );
   }
