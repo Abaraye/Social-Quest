@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/models/partner.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
-import 'package:mvp_social_quest/services/firestore_service.dart';
+import 'package:mvp_social_quest/services/firestore/partner_service.dart';
 import '../../widgets/partner_card.dart';
 
 /// Page affichant la liste des partenaires (activités)
@@ -92,7 +92,7 @@ class _PartnersListPageState extends State<PartnersListPage> {
           // 📡 Données récupérées en temps réel depuis Firestore
           Expanded(
             child: StreamBuilder<List<Partner>>(
-              stream: FirestoreService.getPartners(),
+              stream: PartnerService.getPartners(),
               builder: (context, snapshot) {
                 // Chargement
                 if (snapshot.connectionState == ConnectionState.waiting) {

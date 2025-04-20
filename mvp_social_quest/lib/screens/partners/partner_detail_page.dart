@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mvp_social_quest/services/firestore/slot_service.dart';
 
 import '../../models/partner.dart';
-import '../../services/firestore_service.dart';
 
 /// Écran qui affiche les détails d'un partenaire (activité)
 /// ainsi que les créneaux disponibles et leurs réductions.
@@ -29,9 +29,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
 
   /// 🔁 Récupère tous les slots du partenaire
   Future<void> _loadSlots() async {
-    final fetchedSlots = await FirestoreService.getPartnerSlots(
-      widget.partner.id,
-    );
+    final fetchedSlots = await SlotService.getPartnerSlots(widget.partner.id);
     setState(() {
       slots = fetchedSlots;
       isLoading = false;

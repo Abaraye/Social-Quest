@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mvp_social_quest/screens/auth/login_page.dart';
-import '../../services/auth_service.dart';
 import './user_type_selector.dart';
 import '../home/home_page.dart';
 

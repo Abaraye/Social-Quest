@@ -102,4 +102,22 @@ class Partner {
 
   @override
   int get hashCode => id.hashCode;
+
+  /// ✅ Helper : vérifie s’il y a au moins un créneau à venir (future ou maintenant)
+  bool get hasUpcomingSlot {
+    final now = DateTime.now();
+    return slots.values.any(
+      (reductions) => reductions.any(
+        (r) => r['startTime'] is DateTime && r['startTime'].isAfter(now),
+      ),
+    );
+  }
+
+  /// ✅ Helper : validation minimale du partenaire
+  bool get isValid {
+    return name.isNotEmpty &&
+        description.isNotEmpty &&
+        latitude != 0 &&
+        longitude != 0;
+  }
 }

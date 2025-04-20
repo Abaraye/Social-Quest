@@ -35,7 +35,7 @@ class _HomePageState extends State<HomePage> {
     final doc =
         await FirebaseFirestore.instance
             .collection('users')
-            .doc(_user!.uid)
+            .doc(_user.uid)
             .get();
 
     setState(() {

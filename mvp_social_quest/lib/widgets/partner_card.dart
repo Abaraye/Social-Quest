@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/partner.dart';
+import 'common/favorite_button.dart';
+import 'common/category_badge.dart';
 
-/// 🔹 Carte UI représentant un partenaire/activité
-/// Utilisée dans la liste des partenaires, favoris, etc.
 class PartnerCard extends StatelessWidget {
-  final Partner partner; // Le modèle de l'activité
-  final bool isFavorite; // L'état actuel du favori
-  final VoidCallback onFavoriteToggle; // Callback pour gérer le favori
-  final VoidCallback onTap; // Callback pour ouvrir les détails
+  final Partner partner;
+  final bool isFavorite;
+  final VoidCallback onFavoriteToggle;
+  final VoidCallback onTap;
 
   const PartnerCard({
     super.key,
@@ -16,28 +16,6 @@ class PartnerCard extends StatelessWidget {
     required this.onFavoriteToggle,
     required this.onTap,
   });
-
-  /// 🎯 Emoji associé à chaque catégorie
-  String _categoryEmoji(String category) {
-    switch (category.toLowerCase()) {
-      case 'cuisine':
-        return '🍳';
-      case 'sport':
-        return '🚴';
-      case 'culture':
-        return '🎨';
-      case 'jeux':
-        return '🎲';
-      case 'bien-être':
-        return '🧘';
-      case 'musique':
-        return '🎵';
-      case 'détente':
-        return '🛀';
-      default:
-        return '🎯';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +31,7 @@ class PartnerCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Titre et bouton favori
+              // 🔹 Titre + bouton favori
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -66,44 +44,20 @@ class PartnerCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite ? Colors.redAccent : Colors.grey,
-                    ),
-                    onPressed: onFavoriteToggle,
+                  FavoriteButton(
+                    isFavorite: isFavorite,
+                    onToggle: onFavoriteToggle,
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
 
-              // 🔹 Tags (catégorie, réduction...)
+              // 🔹 Tags (catégorie + réduction)
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
-                  // 🏷 Catégorie
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${_categoryEmoji(partner.category)} ${partner.category}',
-                      style: TextStyle(
-                        color: Colors.blue.shade800,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-
-                  // 🔥 Réduction max
+                  CategoryBadge(category: partner.category),
                   if (partner.maxReductionDisplay > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -125,14 +79,11 @@ class PartnerCard extends StatelessWidget {
                     ),
                 ],
               ),
-
               const SizedBox(height: 8),
 
               // 🔹 Description
               Text(
                 partner.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 14, color: Colors.black87),
               ),
             ],

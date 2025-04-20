@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:mvp_social_quest/screens/auth/welcome_page.dart';
 import 'package:mvp_social_quest/screens/home/reservations_page.dart';
 import 'package:mvp_social_quest/screens/auth/login_page.dart';
 import 'package:mvp_social_quest/screens/auth/user_type_selector.dart';
 
-import '../../services/auth_service.dart';
+import '../../services/auth/auth_service.dart';
 
 /// Page profil — affiche les infos utilisateur ou propose de se connecter/s'inscrire.
 class ProfilePage extends StatelessWidget {
