@@ -1,33 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mvp_social_quest/services/firestore/slot_service.dart';
 
 import '../../models/partner.dart';
+import '../../services/firestore/slot_service.dart';
+import '../../services/firestore/booking_service.dart';
 
-/// Écran qui affiche les détails d'un partenaire (activité)
-/// ainsi que les créneaux disponibles et leurs réductions.
+/// 🧾 Page de détail d’un partenaire (activité)
+/// Affiche la description, les créneaux disponibles, les réductions
+/// Permet à l’utilisateur de réserver un créneau avec une réduction
 class PartnerDetailPage extends StatefulWidget {
   final Partner partner;
 
-  const PartnerDetailPage({Key? key, required this.partner}) : super(key: key);
+  const PartnerDetailPage({super.key, required this.partner});
 
   @override
   State<PartnerDetailPage> createState() => _PartnerDetailPageState();
 }
 
 class _PartnerDetailPageState extends State<PartnerDetailPage> {
-  Map<String, dynamic>? selectedSlot;
   List<Map<String, dynamic>> slots = [];
+  Map<String, dynamic>? selectedSlot;
+  Map<String, dynamic>? selectedReduction;
+
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSlots();
+    _loadSlots(); // Chargement initial des créneaux
   }
 
-  /// 🔁 Récupère tous les slots du partenaire
+  /// 🔁 Récupère les créneaux disponibles depuis Firebase
   Future<void> _loadSlots() async {
     final fetchedSlots = await SlotService.getPartnerSlots(widget.partner.id);
     setState(() {
@@ -36,11 +40,65 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
     });
   }
 
-  /// 🔧 Formatage d'une réduction pour l'affichage
+  /// 🧮 Formatte une réduction pour affichage
   String _formatReduction(Map<String, dynamic> r) {
     final amount = r['amount'];
     final groupSize = r['groupSize'];
     return "-$amount% dès $groupSize personne${groupSize > 1 ? 's' : ''}";
+  }
+
+  /// ✅ Effectue la réservation en appelant BookingService et affiche une confirmation
+  Future<void> _confirmReservation() async {
+    final slotId = selectedSlot!['id'];
+
+    await BookingService.createBooking(
+      partnerId: widget.partner.id,
+      slotId: slotId,
+      selectedReduction: selectedReduction!,
+    );
+
+    // 🎉 Affichage d’un bottom sheet de confirmation
+    final formatted = DateFormat(
+      'dd/MM/yyyy - HH:mm',
+    ).format((selectedSlot!['startTime'] as Timestamp).toDate());
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (_) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Réservation Confirmée 🎉",
+                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${widget.partner.name}\n$formatted\n${_formatReduction(selectedReduction!)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  child: const Text(
+                    'Fermer',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
   }
 
   @override
@@ -58,18 +116,14 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔹 Description de l'activité
+                    // 📝 Description de l’activité
                     Text(
                       widget.partner.description,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                        height: 1.4,
-                      ),
+                      style: const TextStyle(fontSize: 16, height: 1.4),
                     ),
                     const SizedBox(height: 24),
 
-                    // 🔹 Liste des créneaux disponibles
+                    // 🕒 Sélection des créneaux disponibles
                     const Text(
                       '🕒 Créneaux disponibles',
                       style: TextStyle(
@@ -86,23 +140,24 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                             final formatted = DateFormat(
                               'dd/MM/yyyy - HH:mm',
                             ).format(timestamp.toDate());
-
                             return ChoiceChip(
                               label: Text(formatted),
                               selected: selectedSlot == slot,
                               selectedColor: Colors.deepPurple.shade100,
                               onSelected: (_) {
-                                setState(() => selectedSlot = slot);
+                                setState(() {
+                                  selectedSlot = slot;
+                                  selectedReduction =
+                                      null; // Réinitialiser les réductions
+                                });
                               },
                             );
                           }).toList(),
                     ),
                     const SizedBox(height: 24),
 
-                    // 🔹 Réductions du créneau sélectionné
-                    if (selectedSlot != null &&
-                        selectedSlot!['reductions'] != null &&
-                        selectedSlot!['reductions'] is List)
+                    // 🎁 Réductions disponibles pour le créneau sélectionné
+                    if (selectedSlot?['reductions'] != null)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -118,10 +173,12 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                             spacing: 8,
                             children: List<Widget>.from(
                               (selectedSlot!['reductions'] as List).map((r) {
-                                final label = _formatReduction(r);
-                                return Chip(
-                                  label: Text(label),
-                                  backgroundColor: Colors.green.shade50,
+                                return ChoiceChip(
+                                  label: Text(_formatReduction(r)),
+                                  selected: selectedReduction == r,
+                                  onSelected:
+                                      (_) =>
+                                          setState(() => selectedReduction = r),
                                 );
                               }),
                             ),
@@ -131,7 +188,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
 
                     const Spacer(),
 
-                    // 🔹 Bouton "Réserver"
+                    // ✅ Bouton de réservation
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -140,71 +197,12 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                           color: Colors.white,
                         ),
                         onPressed:
-                            selectedSlot != null
-                                ? () {
-                                  final formatted = DateFormat(
-                                    'dd/MM/yyyy - HH:mm',
-                                  ).format(
-                                    (selectedSlot!['startTime'] as Timestamp)
-                                        .toDate(),
-                                  );
-
-                                  // 👉 Affichage d’un modal de confirmation
-                                  showModalBottomSheet(
-                                    context: context,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.vertical(
-                                        top: Radius.circular(20),
-                                      ),
-                                    ),
-                                    builder:
-                                        (_) => Padding(
-                                          padding: const EdgeInsets.all(24),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Text(
-                                                'Réservation Confirmée 🎉',
-                                                style: TextStyle(
-                                                  fontSize: 25,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Text(
-                                                '${widget.partner.name}\n$formatted',
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 24),
-                                              ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      Colors.deepPurple,
-                                                  minimumSize:
-                                                      const Size.fromHeight(50),
-                                                ),
-                                                onPressed:
-                                                    () =>
-                                                        Navigator.pop(context),
-                                                child: const Text(
-                                                  'Fermer',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  );
-                                }
+                            selectedSlot != null && selectedReduction != null
+                                ? _confirmReservation
                                 : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                              selectedSlot != null
+                              selectedSlot != null && selectedReduction != null
                                   ? Colors.green
                                   : Colors.grey.shade400,
                           minimumSize: const Size.fromHeight(50),

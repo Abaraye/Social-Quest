@@ -2,6 +2,7 @@ class Partner {
   final String id;
   final String name;
   final String description;
+  final String address;
   final Map<String, List<Map<String, dynamic>>> slots;
   final String category;
   final double latitude;
@@ -12,6 +13,7 @@ class Partner {
     required this.id,
     required this.name,
     required this.description,
+    required this.address,
     required this.slots,
     required this.category,
     required this.latitude,
@@ -25,6 +27,7 @@ class Partner {
       id: json['id'],
       name: json['name'],
       description: json['description'],
+      address: json['address'],
       category: json['category'],
       latitude: (json['latitude'] ?? 0.0).toDouble(),
       longitude: (json['longitude'] ?? 0.0).toDouble(),
@@ -39,6 +42,7 @@ class Partner {
       'id': id,
       'name': name,
       'description': description,
+      'address': address,
       'category': category,
       'latitude': latitude,
       'longitude': longitude,
@@ -61,6 +65,7 @@ class Partner {
       id: id,
       name: data['name'] ?? '',
       description: data['description'] ?? '',
+      address: data['address'] ?? '',
       category: data['category'] ?? '',
       latitude: (data['latitude'] ?? 0.0).toDouble(),
       longitude: (data['longitude'] ?? 0.0).toDouble(),

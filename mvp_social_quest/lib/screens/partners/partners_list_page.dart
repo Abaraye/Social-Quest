@@ -1,14 +1,15 @@
+// =============================================================
+// lib/screens/partners/partners_list_page.dart (version refactor)
+// =============================================================
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/models/partner.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
 import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/services/firestore/favorites_service.dart';
 import '../../widgets/partner_card.dart';
 
-/// Page affichant la liste des partenaires (activités)
-/// avec filtres de recherche, catégories, et tri dynamique.
 class PartnersListPage extends StatefulWidget {
   const PartnersListPage({super.key});
-
   @override
   State<PartnersListPage> createState() => _PartnersListPageState();
 }
@@ -27,7 +28,7 @@ class _PartnersListPageState extends State<PartnersListPage> {
       ),
       body: Column(
         children: [
-          // 🔎 Barre de recherche
+          // 🔎 Recherche
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -41,8 +42,7 @@ class _PartnersListPageState extends State<PartnersListPage> {
               },
             ),
           ),
-
-          // 🔖 Filtres par catégories
+          // 🔖 Catégories
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -66,8 +66,7 @@ class _PartnersListPageState extends State<PartnersListPage> {
               ],
             ),
           ),
-
-          // 🔃 Menu de tri
+          // 🔃 Tri
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: DropdownButtonFormField<String>(
@@ -81,80 +80,78 @@ class _PartnersListPageState extends State<PartnersListPage> {
                 DropdownMenuItem(value: 'reduction', child: Text('Réduction')),
                 DropdownMenuItem(value: 'distance', child: Text('Distance')),
               ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => sortBy = value);
-                }
-              },
+              onChanged: (value) => setState(() => sortBy = value ?? 'nom'),
             ),
           ),
-
-          // 📡 Données récupérées en temps réel depuis Firestore
+          // 📡 Données
           Expanded(
-            child: StreamBuilder<List<Partner>>(
-              stream: PartnerService.getPartners(),
-              builder: (context, snapshot) {
-                // Chargement
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                // Aucune donnée
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text("Aucune activité trouvée."));
-                }
-
-                // Liste brute des partenaires
-                List<Partner> partners = snapshot.data!;
-
-                // 🔍 Appliquer le filtre de recherche et la catégorie
-                partners =
-                    partners.where((p) {
-                      final matchesQuery = p.name.toLowerCase().contains(
-                        searchQuery,
+            child: StreamBuilder<List<String>>(
+              stream: FavoritesService.favoriteIdsStream(),
+              builder: (context, favSnap) {
+                final favIds = favSnap.data ?? [];
+                return StreamBuilder<List<Partner>>(
+                  stream: PartnerService.getPartners(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snap.hasData || snap.data!.isEmpty) {
+                      return const Center(
+                        child: Text('Aucune activité trouvée.'),
                       );
-                      final matchesCategory =
-                          selectedCategory.isEmpty ||
-                          p.category == selectedCategory;
-                      return matchesQuery && matchesCategory;
-                    }).toList();
-
-                // 🔃 Appliquer le tri
-                if (sortBy == 'nom') {
-                  partners.sort((a, b) => a.name.compareTo(b.name));
-                } else if (sortBy == 'reduction') {
-                  partners.sort(
-                    (b, a) =>
-                        a.maxReductionDisplay.compareTo(b.maxReductionDisplay),
-                  );
-                } else if (sortBy == 'distance') {
-                  // 👇 À implémenter avec la géolocalisation
-                  // partners.sort((a, b) => a.distance.compareTo(b.distance));
-                }
-
-                // 🧱 Affichage des PartnerCard
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: partners.length,
-                  itemBuilder: (context, index) {
-                    final partner = partners[index];
-                    return PartnerCard(
-                      partner: partner,
-                      isFavorite:
-                          false, // à connecter avec Firestore ou SharedPreferences
-                      onFavoriteToggle: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("${partner.name} ajouté aux favoris"),
-                          ),
+                    }
+                    var partners = snap.data!;
+                    partners =
+                        partners.where((p) {
+                          final matchQuery = p.name.toLowerCase().contains(
+                            searchQuery,
+                          );
+                          final matchCat =
+                              selectedCategory.isEmpty ||
+                              p.category == selectedCategory;
+                          return matchQuery && matchCat;
+                        }).toList();
+                    // tri
+                    if (sortBy == 'nom') {
+                      partners.sort((a, b) => a.name.compareTo(b.name));
+                    } else if (sortBy == 'reduction') {
+                      partners.sort(
+                        (b, a) => a.maxReductionDisplay.compareTo(
+                          b.maxReductionDisplay,
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: partners.length,
+                      itemBuilder: (_, i) {
+                        final partner = partners[i];
+                        final isFav = FavoritesService.isFavoritedSync(
+                          favIds,
+                          partner.id,
                         );
-                      },
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PartnerDetailPage(partner: partner),
-                          ),
+                        return PartnerCard(
+                          partner: partner,
+                          isFavorite: isFav,
+                          onFavoriteToggle: () async {
+                            await FavoritesService.toggleFavorite(partner.id);
+                            final text =
+                                isFav
+                                    ? 'retiré des favoris'
+                                    : 'ajouté aux favoris';
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${partner.name} $text')),
+                            );
+                          },
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => PartnerDetailPage(partner: partner),
+                              ),
+                            );
+                          },
                         );
                       },
                     );

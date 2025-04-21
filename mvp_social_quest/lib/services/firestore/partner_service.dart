@@ -118,4 +118,13 @@ class PartnerService {
       };
     }).toList();
   }
+
+  static Future<Partner> getPartnerById(String id) async {
+    final doc = await _firestore.collection('partners').doc(id).get();
+    if (!doc.exists) {
+      throw Exception('Activité introuvable');
+    }
+
+    return Partner.fromMap(doc.data()!, doc.id);
+  }
 }

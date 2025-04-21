@@ -1,4 +1,5 @@
 // lib/services/firestore/booking_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/booking.dart';
@@ -7,7 +8,8 @@ import '../../models/booking.dart';
 class BookingService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// ➕ Crée une nouvelle réservation utilisateur avec startTime extrait du slot
+  /// ➕ Crée une nouvelle réservation utilisateur
+  /// Récupère le `startTime` directement depuis le créneau (`slotId`) sélectionné
   static Future<void> createBooking({
     required String partnerId,
     required String slotId,
@@ -16,8 +18,7 @@ class BookingService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('Utilisateur non connecté');
 
-    // ⏳ Récupération du startTime à partir du slot
-    final slotSnapshot =
+    final slotDoc =
         await _firestore
             .collection('partners')
             .doc(partnerId)
@@ -25,14 +26,13 @@ class BookingService {
             .doc(slotId)
             .get();
 
-    if (!slotSnapshot.exists) {
-      throw Exception('Le créneau sélectionné est introuvable.');
+    if (!slotDoc.exists) {
+      throw Exception('Créneau introuvable pour cette activité.');
     }
 
-    final startTime = slotSnapshot.data()?['startTime'] as Timestamp?;
-
+    final startTime = slotDoc.data()?['startTime'] as Timestamp?;
     if (startTime == null) {
-      throw Exception('Le créneau ne contient pas de startTime valide.');
+      throw Exception('Le créneau sélectionné n’a pas de startTime valide.');
     }
 
     await _firestore.collection('bookings').add({
@@ -45,7 +45,7 @@ class BookingService {
     });
   }
 
-  /// 📥 Récupère les réservations utilisateur sous forme de `Booking`
+  /// 📥 Récupère toutes les réservations de l’utilisateur connecté
   static Stream<List<Booking>> getUserBookings() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Stream.empty();
@@ -55,6 +55,9 @@ class BookingService {
         .where('userId', isEqualTo: user.uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError((error) {
+          print('❌ Erreur Firestore - getUserBookings: $error');
+        })
         .map(
           (snapshot) =>
               snapshot.docs
@@ -63,18 +66,20 @@ class BookingService {
         );
   }
 
-  /// ⏳ Récupère uniquement les réservations à venir
+  /// 📆 Récupère uniquement les réservations futures
   static Stream<List<Booking>> getUpcomingUserBookings() {
-    final now = Timestamp.now();
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Stream.empty();
 
     return _firestore
         .collection('bookings')
         .where('userId', isEqualTo: user.uid)
-        .where('startTime', isGreaterThan: now)
         .orderBy('startTime')
+        .where('startTime', isGreaterThan: Timestamp.now())
         .snapshots()
+        .handleError((error) {
+          print('❌ Erreur Firestore - getUpcomingUserBookings: $error');
+        })
         .map(
           (snapshot) =>
               snapshot.docs
@@ -88,7 +93,7 @@ class BookingService {
     await _firestore.collection('bookings').doc(bookingId).delete();
   }
 
-  /// 🛠 Met à jour un champ de la réservation (optionnel)
+  /// 🛠 Met à jour un ou plusieurs champs d’une réservation
   static Future<void> updateBooking({
     required String bookingId,
     required Map<String, dynamic> updates,

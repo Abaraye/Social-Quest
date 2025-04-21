@@ -6,8 +6,9 @@ import 'package:mvp_social_quest/screens/partners/partners_list_page.dart';
 import 'package:mvp_social_quest/screens/favorites/favorites_page.dart';
 import 'package:mvp_social_quest/screens/home/profile_page.dart';
 import 'package:mvp_social_quest/screens/partners/manage_partner_page.dart';
+import 'package:mvp_social_quest/screens/bookings/my_bookings_page.dart'; // ✅ Nouveau
 
-/// Page principale qui gère la navigation entre les onglets selon le rôle de l'utilisateur.
+/// 🏠 Page principale avec navigation conditionnelle selon le rôle (user / merchant)
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -16,8 +17,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0; // Index de l'onglet sélectionné
-  String? _userType; // 'user' ou 'merchant'
+  int _selectedIndex = 0;
+  String? _userType;
   bool _isLoading = true;
 
   final _user = FirebaseAuth.instance.currentUser;
@@ -25,10 +26,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _fetchUserType(); // Charger le type d'utilisateur à l'ouverture
+    _fetchUserType();
   }
 
-  /// Récupère le rôle ('user' ou 'merchant') depuis Firestore
+  /// 🔄 Récupération du type d'utilisateur
   Future<void> _fetchUserType() async {
     if (_user == null) return;
 
@@ -39,7 +40,7 @@ class _HomePageState extends State<HomePage> {
             .get();
 
     setState(() {
-      _userType = doc.data()?['type'] ?? 'user'; // Valeur par défaut : 'user'
+      _userType = doc.data()?['type'] ?? 'user';
       _isLoading = false;
     });
   }
@@ -52,17 +53,18 @@ class _HomePageState extends State<HomePage> {
 
     final isMerchant = _userType == 'merchant';
 
-    // Définition des pages selon le type d'utilisateur
+    /// 🧭 Pages à afficher dans les onglets
     final pages =
         isMerchant
             ? [const ManagePartnerPage(), const ProfilePage()]
             : [
               const PartnersListPage(),
+              const MyBookingsPage(), // 🆕 Page Mes réservations
               const FavoritesPage(),
               const ProfilePage(),
             ];
 
-    // Définition des items de la BottomNavigationBar
+    /// 🔘 Items de la BottomNavigationBar
     final items =
         isMerchant
             ? [
@@ -79,6 +81,10 @@ class _HomePageState extends State<HomePage> {
               const BottomNavigationBarItem(
                 icon: Icon(Icons.explore),
                 label: 'Explorer',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.event),
+                label: 'Réservations',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.favorite),

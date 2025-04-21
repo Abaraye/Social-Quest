@@ -1,9 +1,8 @@
-// lib/models/booking.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 🎓 Modèle de données pour une réservation utilisateur
 typedef Reduction = Map<String, dynamic>;
 
+/// 🎫 Modèle d'une réservation utilisateur
 class Booking {
   final String id;
   final String userId;
@@ -11,6 +10,7 @@ class Booking {
   final String slotId;
   final Reduction reductionChosen;
   final Timestamp createdAt;
+  final Timestamp startTime; // ✅ Ajout ici
 
   Booking({
     required this.id,
@@ -19,6 +19,7 @@ class Booking {
     required this.slotId,
     required this.reductionChosen,
     required this.createdAt,
+    required this.startTime, // ✅ Ajout ici
   });
 
   factory Booking.fromMap(Map<String, dynamic> data, String id) {
@@ -29,6 +30,7 @@ class Booking {
       slotId: data['slotId'] ?? '',
       reductionChosen: Map<String, dynamic>.from(data['reductionChosen'] ?? {}),
       createdAt: data['createdAt'] ?? Timestamp.now(),
+      startTime: data['startTime'] ?? Timestamp.now(), // ✅ Important
     );
   }
 
@@ -38,5 +40,6 @@ class Booking {
     'slotId': slotId,
     'reductionChosen': reductionChosen,
     'createdAt': createdAt,
+    'startTime': startTime,
   };
 }
