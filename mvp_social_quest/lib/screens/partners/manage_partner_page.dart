@@ -1,25 +1,32 @@
-// lib/screens/partners/manage_partner_page.dart
+// =============================================================
+// lib/screens/partners/manage_partner_page.dart – v2.4
+// =============================================================
+// ✨ Page permettant de créer, modifier ou supprimer une activité commerçante
+// 🧼 Corrige le bug `setState after dispose`
+// ✅ Redirige vers le dashboard commerçant après création ou suppression
+// -------------------------------------------------------------
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'edit_partner_page.dart';
 import '../../widgets/partners/manage/header.dart';
 
-/// 🔧 Page permettant aux commerçants de créer et visualiser leurs activités
 class ManagePartnerPage extends StatefulWidget {
-  const ManagePartnerPage({super.key});
+  final String? partnerId;
+
+  const ManagePartnerPage({super.key, this.partnerId});
 
   @override
   State<ManagePartnerPage> createState() => _ManagePartnerPageState();
 }
 
 class _ManagePartnerPageState extends State<ManagePartnerPage> {
-  final nameController = TextEditingController();
-  final descriptionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String _selectedCat = 'Cuisine';
 
-  final List<String> categories = [
+  final _cats = [
     'Cuisine',
     'Sport',
     'Culture',
@@ -28,144 +35,166 @@ class _ManagePartnerPageState extends State<ManagePartnerPage> {
     'Musique',
     'Autre',
   ];
-  String selectedCategory = 'Cuisine';
 
-  bool isLoading = true;
-  List<Map<String, dynamic>> partners = [];
+  bool _isLoading = false;
+  bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPartners();
-  }
-
-  /// 🔁 Récupère les activités du commerçant connecté
-  Future<void> _loadPartners() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final snapshot =
-        await FirebaseFirestore.instance
-            .collection('partners')
-            .where('ownerId', isEqualTo: user.uid)
-            .get();
-
-    if (mounted) {
-      setState(() {
-        partners =
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList();
-        isLoading = false;
-      });
+    if (widget.partnerId != null) {
+      _loadPartnerData();
     }
   }
 
-  /// ➕ Création d'une nouvelle activité pour le commerçant connecté
-  Future<void> _createPartner() async {
+  Future<void> _loadPartnerData() async {
+    setState(() => _isLoading = true);
+    final doc =
+        await FirebaseFirestore.instance
+            .collection('partners')
+            .doc(widget.partnerId)
+            .get();
+
+    if (!mounted) return;
+
+    if (doc.exists) {
+      final d = doc.data()!;
+      _nameCtrl.text = d['name'] ?? '';
+      _descCtrl.text = d['description'] ?? '';
+      _selectedCat = d['category'] ?? 'Cuisine';
+      setState(() => _isEditMode = true);
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final doc = await FirebaseFirestore.instance.collection('partners').add({
+    final data = {
       'ownerId': user.uid,
-      'name': nameController.text.trim(),
-      'description': descriptionController.text.trim(),
-      'category': selectedCategory,
+      'name': _nameCtrl.text.trim(),
+      'description': _descCtrl.text.trim(),
+      'category': _selectedCat,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
 
-    if (mounted) {
-      setState(() {
-        partners.add({
-          'id': doc.id,
-          'name': nameController.text.trim(),
-          'description': descriptionController.text.trim(),
-          'category': selectedCategory,
-        });
-        nameController.clear();
-        descriptionController.clear();
-      });
+    setState(() => _isLoading = true);
+
+    if (_isEditMode && widget.partnerId != null) {
+      await FirebaseFirestore.instance
+          .collection('partners')
+          .doc(widget.partnerId)
+          .update(data);
+    } else {
+      await FirebaseFirestore.instance.collection('partners').add(data);
+      _nameCtrl.clear();
+      _descCtrl.clear();
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _isEditMode ? 'Activité mise à jour' : 'Activité créée avec succès',
+        ),
+      ),
+    );
+
+    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+  }
+
+  Future<void> _handleDelete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Supprimer cette activité ?'),
+            content: const Text(
+              'Cette action est irréversible. Toutes les données associées seront perdues.',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Annuler'),
+                onPressed: () => Navigator.of(ctx).pop(false),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Supprimer'),
+                onPressed: () => Navigator.of(ctx).pop(true),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true && widget.partnerId != null) {
+      await FirebaseFirestore.instance
+          .collection('partners')
+          .doc(widget.partnerId)
+          .delete();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Activité supprimée')));
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mes activités"),
+        title: Text(
+          _isEditMode ? 'Modifier mon activité' : 'Nouvelle activité',
+        ),
         backgroundColor: Colors.deepPurple,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// 🔹 Formulaire de création d'une nouvelle activité
-            ManagePartnerHeader(
-              formKey: _formKey,
-              nameController: nameController,
-              descriptionController: descriptionController,
-              selectedCategory: selectedCategory,
-              categories: categories,
-              onCategoryChanged:
-                  (value) => setState(() => selectedCategory = value ?? ''),
-              onCreate: () {
-                if (_formKey.currentState!.validate()) _createPartner();
-              },
-            ),
-
-            const SizedBox(height: 32),
-            const Text(
-              "Mes activités",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-
-            if (partners.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text("Aucune activité créée pour ce compte."),
-              ),
-
-            /// 🔹 Liste des cartes des activités existantes avec bouton Gérer
-            ...partners.map(
-              (partner) => Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  title: Text(partner['name'] ?? ''),
-                  subtitle: Text(partner['description'] ?? ''),
-                  trailing: SizedBox(
-                    width: 100,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => EditPartnerPage(
-                                  partnerId: partner['id'],
-                                  partnerName: partner['name'],
-                                ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple.shade400,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      child: const Text(
-                        "Gérer",
-                        style: TextStyle(fontSize: 13),
-                      ),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    ManagePartnerHeader(
+                      formKey: _formKey,
+                      nameController: _nameCtrl,
+                      descriptionController: _descCtrl,
+                      selectedCategory: _selectedCat,
+                      categories: _cats,
+                      onCategoryChanged:
+                          (c) => setState(() => _selectedCat = c ?? 'Cuisine'),
+                      onCreate: _handleSave,
+                      isEditing: _isEditMode,
                     ),
-                  ),
+                    if (_isEditMode) ...[
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: _handleDelete,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                        icon: const Icon(Icons.delete),
+                        label: const Text("Supprimer l'activité"),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

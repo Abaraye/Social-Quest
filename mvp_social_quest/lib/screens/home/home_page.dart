@@ -2,110 +2,111 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:mvp_social_quest/screens/partners/partners_list_page.dart';
-import 'package:mvp_social_quest/screens/favorites/favorites_page.dart';
-import 'package:mvp_social_quest/screens/home/profile_page.dart';
-import 'package:mvp_social_quest/screens/partners/manage_partner_page.dart';
-import 'package:mvp_social_quest/screens/bookings/my_bookings_page.dart'; // ✅ Nouveau
+import '../partners/manage_partner_page.dart'; // Activités
+import '../partners/merchant_dashboard_home.dart'; // Dashboard (wrapper)
+import '../profile/profile_page.dart';
+import '../partners/partners_list_page.dart';
+import '../favorites/favorites_page.dart';
+import '../bookings/my_bookings_page.dart';
 
-/// 🏠 Page principale avec navigation conditionnelle selon le rôle (user / merchant)
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
-  String? _userType;
-  bool _isLoading = true;
-
-  final _user = FirebaseAuth.instance.currentUser;
+  int _index = 0;
+  String? _type;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserType();
+    _fetchType();
   }
 
-  /// 🔄 Récupération du type d'utilisateur
-  Future<void> _fetchUserType() async {
-    if (_user == null) return;
-
+  Future<void> _fetchType() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
     final doc =
         await FirebaseFirestore.instance
             .collection('users')
-            .doc(_user.uid)
+            .doc(user.uid)
             .get();
-
     setState(() {
-      _userType = doc.data()?['type'] ?? 'user';
-      _isLoading = false;
+      _type = doc.data()?['type'] ?? 'user';
+      _loading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final merchant = _type == 'merchant';
 
-    final isMerchant = _userType == 'merchant';
-
-    /// 🧭 Pages à afficher dans les onglets
+    // pages ---------------------------------------------------------------
     final pages =
-        isMerchant
-            ? [const ManagePartnerPage(), const ProfilePage()]
+        merchant
+            ? [
+              const ManagePartnerPage(), // 0 Activités
+              const MerchantDashboardHome(), // 1 Dashboard
+              const ProfilePage(), // 2 Profil
+            ]
             : [
               const PartnersListPage(),
-              const MyBookingsPage(), // 🆕 Page Mes réservations
+              const MyBookingsPage(),
               const FavoritesPage(),
               const ProfilePage(),
             ];
 
-    /// 🔘 Items de la BottomNavigationBar
+    // items ---------------------------------------------------------------
     final items =
-        isMerchant
-            ? [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.edit),
-                label: 'Mon activité',
+        merchant
+            ? const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.storefront),
+                label: 'Activités',
               ),
-              const BottomNavigationBarItem(
+              BottomNavigationBarItem(
+                icon: Icon(Icons.bar_chart),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
                 icon: Icon(Icons.person),
                 label: 'Profil',
               ),
             ]
-            : [
-              const BottomNavigationBarItem(
+            : const [
+              BottomNavigationBarItem(
                 icon: Icon(Icons.explore),
                 label: 'Explorer',
               ),
-              const BottomNavigationBarItem(
+              BottomNavigationBarItem(
                 icon: Icon(Icons.event),
                 label: 'Réservations',
               ),
-              const BottomNavigationBarItem(
+              BottomNavigationBarItem(
                 icon: Icon(Icons.favorite),
                 label: 'Favoris',
               ),
-              const BottomNavigationBarItem(
+              BottomNavigationBarItem(
                 icon: Icon(Icons.person),
                 label: 'Profil',
               ),
             ];
 
     return Scaffold(
-      body: pages[_selectedIndex],
+      body: pages[_index],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        items: items,
+        currentIndex: _index,
         selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.white,
+        onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
+        items: items,
       ),
     );
   }

@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
 import 'package:mvp_social_quest/services/firestore/favorites_service.dart';
-import '../../widgets/partner_card.dart';
+import '../../widgets/partners/partner_card.dart';
 import '../../models/partner.dart';
 
 class FavoritesPage extends StatelessWidget {
