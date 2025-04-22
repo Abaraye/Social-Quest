@@ -4,7 +4,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/partner.dart';
-import 'partner_service.dart';
 
 /// Service unique pour la gestion des favoris (centralisé Firestore)
 /// Stockage : champ `favorites` (Array<String>) dans `/users/{uid}`

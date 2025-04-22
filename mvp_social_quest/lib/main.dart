@@ -2,7 +2,7 @@
 // lib/main.dart – v2.1
 // =============================================================
 // 🔥 Initialisation Firebase + routing + thèmes
-// ✅ Ajout de la route '/dashboard' vers MerchantDashboardWrapper
+// ✔️ Redirige vers AuthGate → Dashboard ou autres selon utilisateur
 // -------------------------------------------------------------
 
 import 'dart:async';
@@ -14,12 +14,12 @@ import 'package:mvp_social_quest/core/router/app_router.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/auth/auth_gate.dart';
-import 'screens/partners/merchant_dashboard_wrapper.dart'; // ✅ Ajout
 
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('fr_FR', null);
+  // Init Crashlytics / FCM lazy here…
 }
 
 void main() {
@@ -29,7 +29,8 @@ void main() {
       runApp(const MyApp());
     },
     (error, stack) {
-      print('Uncaught zone error: $error');
+      print('Uncaught zone error: \$error');
+      // FirebaseCrashlytics.instance.recordError(error, stack);
     },
   );
 }
@@ -47,11 +48,6 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       onGenerateRoute: generateRoute,
       home: const AuthGate(),
-      routes: {
-        '/dashboard':
-            (context) =>
-                const MerchantDashboardWrapper(), // ✅ Route dashboard commerçant
-      },
     );
   }
 }

@@ -31,9 +31,11 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
     _loadSlots(); // Chargement initial des créneaux
   }
 
-  /// 🔁 Récupère les créneaux disponibles depuis Firebase
+  /// 🔁 Récupère les créneaux disponibles depuis Firebase (y compris récurrents)
   Future<void> _loadSlots() async {
-    final fetchedSlots = await SlotService.getPartnerSlots(widget.partner.id);
+    final fetchedSlots = await SlotService.getExpandedPartnerSlots(
+      widget.partner.id,
+    );
     setState(() {
       slots = fetchedSlots;
       isLoading = false;
@@ -147,8 +149,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                               onSelected: (_) {
                                 setState(() {
                                   selectedSlot = slot;
-                                  selectedReduction =
-                                      null; // Réinitialiser les réductions
+                                  selectedReduction = null;
                                 });
                               },
                             );
