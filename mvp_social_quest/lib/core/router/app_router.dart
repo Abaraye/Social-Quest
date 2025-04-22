@@ -1,14 +1,16 @@
 // =============================================================
-// lib/core/app_router.dart – v1.2
+// lib/core/app_router.dart – v1.4
 // =============================================================
 // ✅ Routeur centralisé avec support des pages dynamiques
-// 📌 Gère les routes : /manage/:id, /bookings/:id, /dashboard
+// 📌 Gère les routes : /dashboard, /manage/:id, /bookings/:id, /slots/:id, /fill-rate/:id
 // -------------------------------------------------------------
 
 import 'package:flutter/material.dart';
 import '../../screens/bookings/partner_bookings_page.dart';
 import '../../screens/partners/manage_partner_page.dart';
+import '../../screens/partners/manage_partner_slots_page.dart';
 import '../../screens/partners/merchant_dashboard_home.dart';
+import '../../screens/partners/fillrate_detail_page.dart'; // ✅ Assure-toi que ce chemin est correct
 
 Route<dynamic> generateRoute(RouteSettings settings) {
   final uri = Uri.parse(settings.name ?? '');
@@ -37,6 +39,22 @@ Route<dynamic> generateRoute(RouteSettings settings) {
     final partnerId = pathSegments[1];
     return MaterialPageRoute(
       builder: (_) => PartnerBookingsPage(partnerId: partnerId),
+    );
+  }
+
+  // 🗓️ Exemple : /slots/<partnerId>
+  if (pathSegments.length == 2 && pathSegments[0] == 'slots') {
+    final partnerId = pathSegments[1];
+    return MaterialPageRoute(
+      builder: (_) => ManagePartnerSlotsPage(partnerId: partnerId),
+    );
+  }
+
+  // 📊 Exemple : /fill-rate/<partnerId>
+  if (pathSegments.length == 2 && pathSegments[0] == 'fill-rate') {
+    final partnerId = pathSegments[1];
+    return MaterialPageRoute(
+      builder: (_) => FillRateDetailPage(partnerId: partnerId),
     );
   }
 

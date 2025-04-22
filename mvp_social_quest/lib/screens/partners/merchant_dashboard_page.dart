@@ -1,9 +1,7 @@
 // =============================================================
-// lib/screens/partners/merchant_dashboard_page.dart – v2.3
+// lib/screens/partners/merchant_dashboard_page.dart – v3.2
 // =============================================================
-// ✏️ Bouton de modification intégré à côté du nom de l’activité
-// 🧼 Suppression de la navigation sur le KPI taux de remplissage
-// 💾 Sauvegarde de l’activité sélectionnée localement pour la persistance
+// ✨ Ajout du bouton "Gérer les créneaux" + support onShowCalendar
 // -------------------------------------------------------------
 
 import 'package:flutter/material.dart';
@@ -17,8 +15,11 @@ class MerchantDashboardPage extends StatefulWidget {
   final Map<DateTime, int> bookingsByDay;
   final double fillRate;
   final double avgRating;
+  final double? conversionRate;
+  final double? cancelRate;
   final List<Map<String, String>>? allPartners;
   final void Function(String?)? onPartnerSelected;
+  final VoidCallback? onShowCalendar; // ✅ Ajout ici
 
   const MerchantDashboardPage({
     super.key,
@@ -27,8 +28,11 @@ class MerchantDashboardPage extends StatefulWidget {
     required this.bookingsByDay,
     required this.fillRate,
     required this.avgRating,
+    this.conversionRate,
+    this.cancelRate,
     this.allPartners,
     this.onPartnerSelected,
+    this.onShowCalendar,
   });
 
   @override
@@ -78,33 +82,6 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tableau de bord'),
-        backgroundColor: Colors.deepPurple,
-        actions: [
-          if (widget.allPartners != null && widget.onPartnerSelected != null)
-            PopupMenuButton<String?>(
-              onSelected: (id) {
-                _saveLastPartner(id);
-                widget.onPartnerSelected!(id);
-              },
-              icon: const Icon(Icons.switch_account),
-              itemBuilder:
-                  (ctx) => [
-                    const PopupMenuItem(
-                      value: null,
-                      child: Text('Vue globale'),
-                    ),
-                    ...widget.allPartners!.map(
-                      (p) => PopupMenuItem(
-                        value: p['id'],
-                        child: Text(p['name'] ?? ''),
-                      ),
-                    ),
-                  ],
-            ),
-        ],
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -132,11 +109,31 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
             ),
             const SizedBox(height: 16),
 
-            Row(
+            if (!isGlobal)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ElevatedButton.icon(
+                  onPressed:
+                      () => Navigator.pushNamed(
+                        context,
+                        '/slots/${widget.partnerId}',
+                      ),
+                  icon: const Icon(Icons.edit_calendar),
+                  label: const Text("Gérer les créneaux"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ),
+
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 _kpiCard(
                   context,
-                  'Réservations\nà venir',
+                  'Réservations à venir',
                   '$totalBookings',
                   Icons.event_available,
                   onTap: () {
@@ -150,14 +147,22 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
                 ),
                 _kpiCard(
                   context,
-                  'Taux\nremplissage',
+                  'Taux de remplissage',
                   '${(widget.fillRate * 100).round()} %',
                   Icons.query_stats,
-                  onTap: () {},
+                  onTap: () {
+                    if (widget.partnerId != null) {
+                      Navigator.pushNamed(
+                        context,
+                        '/fill-rate/${widget.partnerId}',
+                      );
+                    }
+                  },
                 ),
+
                 _kpiCard(
                   context,
-                  'Note\nmoyenne',
+                  'Note moyenne',
                   widget.avgRating.toStringAsFixed(1),
                   Icons.star_rate,
                   onTap: () {
@@ -169,6 +174,22 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
                     }
                   },
                 ),
+                if (widget.conversionRate != null)
+                  _kpiCard(
+                    context,
+                    'Taux de conversion',
+                    '${(widget.conversionRate! * 100).round()} %',
+                    Icons.leaderboard,
+                    onTap: () {},
+                  ),
+                if (widget.cancelRate != null)
+                  _kpiCard(
+                    context,
+                    'Taux d’annulation',
+                    '${(widget.cancelRate! * 100).round()} %',
+                    Icons.cancel,
+                    onTap: () {},
+                  ),
               ],
             ),
 
@@ -212,19 +233,21 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
                     ),
                   ),
                   barGroups:
-                      spots.map((s) {
-                        return BarChartGroupData(
-                          x: s.x.toInt(),
-                          barRods: [
-                            BarChartRodData(
-                              fromY: 0,
-                              toY: s.y,
-                              width: 14,
-                              borderRadius: BorderRadius.circular(4),
+                      spots
+                          .map(
+                            (s) => BarChartGroupData(
+                              x: s.x.toInt(),
+                              barRods: [
+                                BarChartRodData(
+                                  fromY: 0,
+                                  toY: s.y,
+                                  width: 14,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ],
                             ),
-                          ],
-                        );
-                      }).toList(),
+                          )
+                          .toList(),
                 ),
               ),
             ),
@@ -240,34 +263,37 @@ class _MerchantDashboardPageState extends State<MerchantDashboardPage> {
     String value,
     IconData icon, {
     required VoidCallback onTap,
-  }) => Expanded(
-    child: GestureDetector(
+  }) {
+    return GestureDetector(
       onTap: onTap,
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(icon, size: 28, color: Colors.deepPurple),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+          child: SizedBox(
+            width: 130,
+            child: Column(
+              children: [
+                Icon(icon, size: 28, color: Colors.deepPurple),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

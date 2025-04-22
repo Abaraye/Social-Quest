@@ -51,7 +51,7 @@ class _HomePageState extends State<HomePage> {
     final pages =
         merchant
             ? [
-              const ManagePartnerPage(), // 0 Activités
+              // 0 Activités
               const MerchantDashboardHome(), // 1 Dashboard
               const ProfilePage(), // 2 Profil
             ]
@@ -66,10 +66,6 @@ class _HomePageState extends State<HomePage> {
     final items =
         merchant
             ? const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.storefront),
-                label: 'Activités',
-              ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.bar_chart),
                 label: 'Dashboard',
