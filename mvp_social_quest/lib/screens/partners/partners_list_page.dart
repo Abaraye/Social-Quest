@@ -21,6 +21,22 @@ class _PartnersListPageState extends State<PartnersListPage> {
   Set<String> _selectedCats = {};
   String _sortBy = 'nom';
 
+  bool _isCatSelected(String c) => _selectedCats.contains(c);
+
+  void _toggleCategory(String cat) {
+    setState(() {
+      if (cat == '__all__') {
+        _selectedCats.clear();
+      } else {
+        if (_selectedCats.contains(cat)) {
+          _selectedCats.remove(cat);
+        } else {
+          _selectedCats.add(cat);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

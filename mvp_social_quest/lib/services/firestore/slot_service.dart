@@ -145,12 +145,12 @@ class SlotService {
         });
   }
 
-  /// 🗑 Supprime tout le groupe de récurrence.
+  /// 🗑️ Supprime toute une récurrence via recurrenceGroupId
   static Future<void> deleteRecurrenceGroup(
     String partnerId,
     String recurrenceGroupId,
   ) async {
-    final query =
+    final group =
         await _firestore
             .collection('partners')
             .doc(partnerId)
@@ -158,7 +158,7 @@ class SlotService {
             .where('recurrenceGroupId', isEqualTo: recurrenceGroupId)
             .get();
 
-    for (final doc in query.docs) {
+    for (final doc in group.docs) {
       await doc.reference.delete();
     }
   }

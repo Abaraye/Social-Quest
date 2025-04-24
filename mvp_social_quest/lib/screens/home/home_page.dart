@@ -56,7 +56,6 @@ class _HomePageState extends State<HomePage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Liste des pages et items selon le rôle
     final pages =
         _isMerchant
             ? [const MerchantDashboardHome(), const ProfilePage()]

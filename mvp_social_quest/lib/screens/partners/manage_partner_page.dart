@@ -1,4 +1,10 @@
-// lib/screens/partners/manage_partner_page.dart
+// =============================================================
+// lib/screens/partners/manage_partner_page.dart – v2.4
+// =============================================================
+// ✨ Page permettant de créer, modifier ou supprimer une activité commerçante
+// 🧼 Corrige le bug `setState after dispose`
+// ✅ Redirige vers le dashboard commerçant après création ou suppression
+// -------------------------------------------------------------
 
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/services/firestore/partner_service.dart';
