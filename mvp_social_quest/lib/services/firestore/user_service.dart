@@ -1,54 +1,29 @@
-// lib/services/firestore/user_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Service de gestion des utilisateurs dans Firestore (collection /users)
+/// 👤 Service pour gérer les données utilisateur (/users/{uid}).
 class UserService {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final _firestore = FirebaseFirestore.instance;
+  static final _auth = FirebaseAuth.instance;
 
-  /// 🔹 Récupère l'utilisateur actuel
+  /// Récupère les données du profil actuel.
   static Future<DocumentSnapshot<Map<String, dynamic>>>
   getCurrentUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception("Utilisateur non connecté");
-
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Utilisateur non connecté');
     return _firestore.collection('users').doc(user.uid).get();
   }
 
-  /// 🔹 Met à jour un champ quelconque dans le profil utilisateur
-  static Future<void> updateUserData(Map<String, dynamic> data) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception("Utilisateur non connecté");
-
-    await _firestore.collection('users').doc(user.uid).update(data);
+  /// Met à jour des champs du profil actuel.
+  static Future<void> updateUserData(Map<String, dynamic> updatedFields) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Utilisateur non connecté');
+    await _firestore.collection('users').doc(user.uid).update(updatedFields);
   }
 
-  /// 🔹 Ajoute un partenaire aux favoris
-  static Future<void> addFavorite(String partnerId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception("Utilisateur non connecté");
-
-    await _firestore.collection('users').doc(user.uid).update({
-      'favorites': FieldValue.arrayUnion([partnerId]),
-    });
-  }
-
-  /// 🔹 Supprime un partenaire des favoris
-  static Future<void> removeFavorite(String partnerId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception("Utilisateur non connecté");
-
-    await _firestore.collection('users').doc(user.uid).update({
-      'favorites': FieldValue.arrayRemove([partnerId]),
-    });
-  }
-
-  /// 🔹 Récupère les favoris de l'utilisateur (optionnel selon les cas d'usage)
+  /// Récupère la liste des IDs favoris.
   static Future<List<String>> getFavorites() async {
-    final userDoc = await getCurrentUserData();
-    final data = userDoc.data();
-    if (data == null) return [];
-
-    return List<String>.from(data['favorites'] ?? []);
+    final snap = await getCurrentUserData();
+    return List<String>.from(snap.data()?['favorites'] ?? []);
   }
 }

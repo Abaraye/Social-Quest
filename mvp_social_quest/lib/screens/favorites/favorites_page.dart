@@ -1,14 +1,12 @@
-// =============================================================
-// lib/screens/favorites/favorites_page.dart (version refactor)
-// =============================================================
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
 import 'package:mvp_social_quest/services/firestore/favorites_service.dart';
-import '../../widgets/partners/partner_card.dart';
-import '../../models/partner.dart';
+import 'package:mvp_social_quest/widgets/partners/partner_card.dart';
+import 'package:mvp_social_quest/models/partner/partner.dart';
 
+/// 📑 Page affichant la liste des partenaires favoris de l’utilisateur.
 class FavoritesPage extends StatelessWidget {
-  const FavoritesPage({super.key});
+  const FavoritesPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -23,32 +21,39 @@ class FavoritesPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           final favorites = snapshot.data ?? [];
           if (favorites.isEmpty) {
             return const Center(
               child: Text(
-                'Vous n\’avez encore aucun favori 💖',
+                'Vous n’avez encore aucun favori 💖',
                 style: TextStyle(fontSize: 16),
               ),
             );
           }
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: favorites.length,
-            itemBuilder: (_, i) {
-              final partner = favorites[i];
+            itemBuilder: (context, index) {
+              final partner = favorites[index];
+              // On utilise directement les getters du modèle Partner
+              final id = partner.id;
+              final name = partner.name;
               return PartnerCard(
                 partner: partner,
                 isFavorite: true,
-                onFavoriteToggle:
-                    () => FavoritesService.toggleFavorite(partner.id),
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PartnerDetailPage(partner: partner),
-                      ),
+                onFavoriteToggle: () {
+                  FavoritesService.toggleFavorite(id);
+                },
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PartnerDetailPage(partner: partner),
                     ),
+                  );
+                },
               );
             },
           );

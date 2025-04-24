@@ -1,242 +1,114 @@
-// lib/widgets/partners/manage/slot_list.dart
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../../../models/slot.dart';
+import '../../../services/firestore/slot_service.dart';
 
+/// Liste de slots avec leurs réductions et options de suppression.
+/// Délègue la suppression au service et notifie le parent via [onSlotsChanged].
 class ManagePartnerSlotList extends StatelessWidget {
-  final List<Map<String, dynamic>> slots;
+  final List<Slot> slots;
   final String partnerId;
-  final void Function(List<Map<String, dynamic>>) onSlotsUpdated;
+  final VoidCallback onSlotsChanged;
 
   const ManagePartnerSlotList({
-    super.key,
+    Key? key,
     required this.slots,
     required this.partnerId,
-    required this.onSlotsUpdated,
-  });
+    required this.onSlotsChanged,
+  }) : super(key: key);
 
-  Future<void> _editReduction(
-    BuildContext context,
-    String slotId,
-    int index,
-    Map<String, dynamic> oldReduction,
-  ) async {
-    final newAmountController = TextEditingController(
-      text: oldReduction['amount'].toString(),
+  Future<void> _deleteOccurrence(BuildContext ctx, Slot slot) async {
+    await SlotService.deleteSingleOccurrence(
+      partnerId,
+      slot.id,
+      slot.startTime,
     );
-    final newGroupSizeController = TextEditingController(
-      text: oldReduction['groupSize'].toString(),
-    );
+    onSlotsChanged();
+  }
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: const Text("Modifier la réduction"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: newAmountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "% réduction"),
-                ),
-                TextField(
-                  controller: newGroupSizeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Nb personnes"),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Annuler"),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'amount':
-                        int.tryParse(newAmountController.text.trim()) ?? 0,
-                    'groupSize':
-                        int.tryParse(newGroupSizeController.text.trim()) ?? 1,
-                  });
-                },
-                child: const Text("Enregistrer"),
-              ),
-            ],
-          ),
-    );
-
-    if (result != null) {
-      final slotRef = FirebaseFirestore.instance
-          .collection('partners')
-          .doc(partnerId)
-          .collection('slots')
-          .doc(slotId);
-
-      final slot = slots.firstWhere((s) => s['id'] == slotId);
-      final updatedReductions = List<Map<String, dynamic>>.from(
-        slot['reductions'],
+  Future<void> _deleteSeries(Slot slot) async {
+    if (slot.recurrenceGroupId != null) {
+      await SlotService.deleteRecurrenceGroup(
+        partnerId,
+        slot.recurrenceGroupId!,
       );
-      updatedReductions[index] = result;
-
-      await slotRef.update({'reductions': updatedReductions});
-      slot['reductions'] = updatedReductions;
-
-      onSlotsUpdated([...slots]);
+      onSlotsChanged();
     }
   }
 
-  Future<void> _deleteReduction(String slotId, int index) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots')
-        .doc(slotId);
-
-    final slot = slots.firstWhere((s) => s['id'] == slotId);
-    final updatedReductions = List<Map<String, dynamic>>.from(
-      slot['reductions'],
-    );
-    updatedReductions.removeAt(index);
-
-    await docRef.update({'reductions': updatedReductions});
-    slot['reductions'] = updatedReductions;
-
-    onSlotsUpdated([...slots]);
-  }
-
-  Future<void> _addReduction(BuildContext context, String slotId) async {
-    final amountController = TextEditingController();
-    final groupSizeController = TextEditingController();
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: const Text("Ajouter une réduction"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "% réduction"),
-                ),
-                TextField(
-                  controller: groupSizeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Nb personnes"),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Annuler"),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'amount': int.tryParse(amountController.text.trim()) ?? 0,
-                    'groupSize':
-                        int.tryParse(groupSizeController.text.trim()) ?? 1,
-                  });
-                },
-                child: const Text("Ajouter"),
-              ),
-            ],
-          ),
-    );
-
-    if (result != null) {
-      final slotRef = FirebaseFirestore.instance
-          .collection('partners')
-          .doc(partnerId)
-          .collection('slots')
-          .doc(slotId);
-
-      final slot = slots.firstWhere((s) => s['id'] == slotId);
-      final updatedReductions = List<Map<String, dynamic>>.from(
-        slot['reductions'],
-      );
-      updatedReductions.add(result);
-
-      await slotRef.update({'reductions': updatedReductions});
-      slot['reductions'] = updatedReductions;
-
-      onSlotsUpdated([...slots]);
-    }
-  }
-
-  Future<void> _deleteSlot(String slotId) async {
+  Future<void> _deleteOneOff(Slot slot) async {
+    // Delete direct document for a one-off slot
     await FirebaseFirestore.instance
         .collection('partners')
         .doc(partnerId)
         .collection('slots')
-        .doc(slotId)
+        .doc(slot.id)
         .delete();
-
-    onSlotsUpdated(slots.where((s) => s['id'] != slotId).toList());
+    onSlotsChanged();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children:
-          slots.map((slot) {
-            final slotId = slot['id'];
-            final date = (slot['startTime'] as Timestamp).toDate();
-            final formattedDate = DateFormat('dd/MM/yyyy - HH:mm').format(date);
-            final reductions = (slot['reductions'] ?? []) as List;
+    if (slots.isEmpty) {
+      return const Center(child: Text('Aucun créneau'));
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: slots.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final slot = slots[i];
+        final formatted = DateFormat(
+          'dd/MM/yyyy – HH:mm',
+        ).format(slot.startTime);
+        final hasSeries =
+            slot.recurrence != null && slot.recurrenceGroupId != null;
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    formattedDate,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: List.generate(reductions.length, (index) {
-                      final r = reductions[index];
-                      return InputChip(
-                        label: Text("-${r['amount']}% dès ${r['groupSize']}p"),
-                        onPressed:
-                            () => _editReduction(context, slotId, index, r),
-                        onDeleted: () => _deleteReduction(slotId, index),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: () => _addReduction(context, slotId),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () => _deleteSlot(slotId),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+        return Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            title: Text(
+              formatted,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              slot.reductions.isNotEmpty
+                  ? '-${slot.reductions.first.amount}% dès ${slot.reductions.first.groupSize}p'
+                  : 'Aucune réduction',
+            ),
+            trailing:
+                hasSeries
+                    ? PopupMenuButton<String>(
+                      onSelected: (value) async {
+                        if (value == 'one')
+                          await _deleteOccurrence(context, slot);
+                        if (value == 'all') await _deleteSeries(slot);
+                      },
+                      itemBuilder:
+                          (_) => const [
+                            PopupMenuItem(
+                              value: 'one',
+                              child: Text('Cette occurrence'),
+                            ),
+                            PopupMenuItem(
+                              value: 'all',
+                              child: Text('Toute la série'),
+                            ),
+                          ],
+                    )
+                    : IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Supprimer',
+                      onPressed: () => _deleteOneOff(slot),
+                    ),
+          ),
+        );
+      },
     );
   }
 }

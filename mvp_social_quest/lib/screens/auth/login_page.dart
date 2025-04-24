@@ -4,9 +4,9 @@ import 'package:mvp_social_quest/screens/home/home_page.dart';
 import 'package:mvp_social_quest/widgets/auth/auth_form_field.dart';
 import 'package:mvp_social_quest/core/utils/form_validators.dart';
 
-/// 🔐 Page de connexion utilisateur
+/// 🔐 Page de connexion par email/mot de passe.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({Key? key}) : super(key: key);
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -14,113 +14,108 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _isLoading = false;
 
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
 
-  bool isLoading = false;
-
-  /// 🔁 Connexion via Firebase Auth
-  Future<void> _handleLogin() async {
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-
-    setState(() => isLoading = true);
+  /// 📲 Tente de se connecter via AuthService
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
     try {
-      final user = await AuthService.signIn(email, password);
-      if (context.mounted && user != null) {
+      final user = await AuthService.signIn(
+        _emailCtrl.text.trim(),
+        _passCtrl.text.trim(),
+      );
+      if (user != null && mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
+          (_) => false,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Connecté avec succès en tant que ${user.email}"),
-          ),
+          SnackBar(content: Text('Connecté en tant que ${user.email}')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : ${e.toString()}')));
+      ).showSnackBar(SnackBar(content: Text('Erreur de connexion : $e')));
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
-  /// 🧱 Interface utilisateur
-  @override
   Widget build(BuildContext context) {
+    // 🧱 UI structurée, facilement décomposable
     return Scaffold(
       appBar: AppBar(title: const Text('Connexion')),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: SingleChildScrollView(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Spacer(),
                 const Text(
                   'Bienvenue de retour 👋',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 32),
 
-                // 📧 Email
+                // Email
                 AuthFormField(
-                  controller: emailController,
-                  label: 'Adresse email',
+                  controller: _emailCtrl,
+                  label: 'Email',
                   icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
                   validator: FormValidators.email,
                 ),
-
                 const SizedBox(height: 16),
 
-                // 🔐 Mot de passe
+                // Mot de passe
                 AuthFormField(
-                  controller: passwordController,
+                  controller: _passCtrl,
                   label: 'Mot de passe',
                   icon: Icons.lock,
                   obscureText: true,
                   validator: FormValidators.password,
                 ),
-
                 const SizedBox(height: 24),
 
-                // 🔘 Bouton de connexion
-                ElevatedButton(
-                  onPressed:
-                      isLoading
-                          ? null
-                          : () {
-                            if (_formKey.currentState!.validate()) {
-                              _handleLogin();
-                            }
-                          },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    minimumSize: const Size.fromHeight(50),
+                // Bouton
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : const Text('Se connecter'),
                   ),
-                  child:
-                      isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                            'Se connecter',
-                            style: TextStyle(color: Colors.white),
-                          ),
                 ),
+                const Spacer(flex: 2),
               ],
             ),
           ),

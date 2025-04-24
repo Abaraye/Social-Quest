@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:mvp_social_quest/screens/auth/login_page.dart';
-import './user_type_selector.dart';
+import 'login_page.dart';
+import 'user_type_selector_page.dart';
 import '../home/home_page.dart';
 
-/// Écran d’accueil de l’application avec animations et choix de navigation.
+/// ✨ Écran d’accueil animé (fade + slide).
 class WelcomePage extends StatefulWidget {
-  const WelcomePage({super.key});
+  const WelcomePage({Key? key}) : super(key: key);
 
   @override
   State<WelcomePage> createState() => _WelcomePageState();
@@ -13,112 +13,72 @@ class WelcomePage extends StatefulWidget {
 
 class _WelcomePageState extends State<WelcomePage>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialisation des animations (fade + slide)
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-
-    _slideAnimation = Tween<Offset>(
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+    _slide = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-
-    _controller.forward();
+    ).animate(_fade);
+    _ctrl.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
-  /// Continuer sans compte (mode invité)
-  void _continueAsGuest() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
-    );
-  }
-
-  /// Accès à la page de connexion
-  void _openLoginPage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-    );
-  }
-
-  /// Accès à la page de sélection du type de compte
-  void _openUserTypeSelector() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const UserTypeSelectorPage()),
-    );
+  void _go(BuildContext ctx, Widget page) {
+    Navigator.push(ctx, MaterialPageRoute(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: FadeTransition(
-        opacity: _fadeAnimation,
+        opacity: _fade,
         child: SlideTransition(
-          position: _slideAnimation,
+          position: _slide,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🌐 Icône de bienvenue
                 const Icon(
                   Icons.travel_explore,
                   size: 72,
                   color: Colors.deepPurple,
                 ),
-
                 const SizedBox(height: 24),
-
                 const Text(
                   "Bienvenue sur Social Quest ✨",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 40),
-
-                // 🔹 Créer un compte
                 ElevatedButton.icon(
                   icon: const Icon(Icons.person_add),
-                  onPressed: _openUserTypeSelector,
+                  label: const Text("Créer un compte"),
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
                     backgroundColor: Colors.deepPurple,
+                    minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  label: const Text(
-                    "Créer un compte",
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  onPressed: () => _go(context, const UserTypeSelectorPage()),
                 ),
-
                 const SizedBox(height: 12),
-
-                // 🔹 Se connecter
                 OutlinedButton.icon(
                   icon: const Icon(Icons.login),
                   label: const Text("Se connecter"),
@@ -128,18 +88,16 @@ class _WelcomePageState extends State<WelcomePage>
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: _openLoginPage,
+                  onPressed: () => _go(context, const LoginPage()),
                 ),
-
                 const SizedBox(height: 12),
-
-                // 🔹 Continuer sans compte
                 TextButton(
-                  onPressed: _continueAsGuest,
-                  child: const Text(
-                    "On verra plus tard",
-                    style: TextStyle(fontSize: 14, color: Colors.black54),
-                  ),
+                  child: const Text("Continuer sans compte"),
+                  onPressed:
+                      () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HomePage()),
+                      ),
                 ),
               ],
             ),

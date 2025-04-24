@@ -1,74 +1,89 @@
-// =============================================================
-// lib/widgets/partners/manage/recurring_slot_form.dart
-// =============================================================
-// 📆 Widget permettant de configurer une récurrence (fréquence, fin, etc.)
-// Utilisé dans `ManagePartnerSlotsPage`
-// -------------------------------------------------------------
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mvp_social_quest/services/firestore/recurrence_helper.dart';
 
+/// Widget de configuration de récurrence d’un slot.
 class RecurringSlotForm extends StatelessWidget {
   final String recurrenceType;
-  final void Function(String) onRecurrenceChanged;
   final DateTime? endDate;
-  final void Function(DateTime?) onEndDateChanged;
+  final DateTime initialStart;
+  final ValueChanged<String> onRecurrenceChanged;
+  final ValueChanged<DateTime?> onEndDateChanged;
 
   const RecurringSlotForm({
-    super.key,
+    Key? key,
     required this.recurrenceType,
-    required this.onRecurrenceChanged,
     required this.endDate,
+    required this.initialStart,
+    required this.onRecurrenceChanged,
     required this.onEndDateChanged,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final recurrenceOptions = [
-      'Aucune',
-      'Tous les jours',
-      'Chaque semaine',
-      'Tous les lundis',
-    ];
+    final options = ['Aucune', 'Tous les jours', 'Chaque semaine'];
+    final preview =
+        (recurrenceType != 'Aucune' && endDate != null)
+            ? RecurrenceHelper.generateOccurrences(
+              slotStart: initialStart,
+              type: recurrenceType,
+              endDate: endDate!,
+            )
+            : <DateTime>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
           value: recurrenceType,
-          items:
-              recurrenceOptions.map((e) {
-                return DropdownMenuItem(value: e, child: Text(e));
-              }).toList(),
-          onChanged: (v) => onRecurrenceChanged(v ?? 'Aucune'),
           decoration: const InputDecoration(labelText: 'Récurrence'),
+          items:
+              options
+                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                  .toList(),
+          onChanged: (v) => onRecurrenceChanged(v ?? 'Aucune'),
         ),
-        const SizedBox(height: 8),
-        if (recurrenceType != 'Aucune')
+        if (recurrenceType != 'Aucune') ...[
+          const SizedBox(height: 8),
           Row(
             children: [
-              const Text('Jusqu’au :'),
-              const SizedBox(width: 12),
               Text(
                 endDate != null
                     ? DateFormat('dd/MM/yyyy').format(endDate!)
-                    : 'Aucune date',
+                    : 'Jusqu’au :',
               ),
-              const SizedBox(width: 12),
               IconButton(
                 icon: const Icon(Icons.calendar_today),
                 onPressed: () async {
-                  final date = await showDatePicker(
+                  final d = await showDatePicker(
                     context: context,
-                    initialDate: DateTime.now().add(const Duration(days: 7)),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    initialDate:
+                        endDate ?? initialStart.add(const Duration(days: 7)),
+                    firstDate: initialStart,
+                    lastDate: initialStart.add(const Duration(days: 365)),
                   );
-                  onEndDateChanged(date);
+                  onEndDateChanged(d);
                 },
               ),
             ],
           ),
+        ],
+        if (preview.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Aperçu des dates :',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Wrap(
+            spacing: 4,
+            children:
+                preview
+                    .map(
+                      (d) => Chip(label: Text(DateFormat('dd/MM').format(d))),
+                    )
+                    .toList(),
+          ),
+        ],
       ],
     );
   }

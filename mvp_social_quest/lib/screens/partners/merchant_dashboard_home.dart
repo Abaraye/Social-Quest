@@ -1,21 +1,11 @@
-// =============================================================
-// lib/screens/partners/merchant_dashboard_home.dart – v2.5
-// =============================================================
-// 🏠 Point d'entrée commerçant après login
-// ✅ Affiche le Dashboard ou un message si aucune activité
-// ➕ Bouton « créer activité » (leading)
-// 🔄 Switch de partenaire intégré à l’AppBar si activités
-// 🗓️ Calendrier masqué par défaut, affiché sur action
-// -------------------------------------------------------------
+// lib/screens/partners/merchant_dashboard_home.dart – v3.0
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import '../../services/firestore/stats_service.dart';
 import 'merchant_dashboard_page.dart';
 import 'manage_partner_page.dart';
-import '../../widgets/partners/dashboard/mini_calendar.dart';
 
 class MerchantDashboardHome extends StatefulWidget {
   const MerchantDashboardHome({super.key});
@@ -26,7 +16,6 @@ class MerchantDashboardHome extends StatefulWidget {
 
 class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
   String? selectedPartnerId;
-  bool showCalendar = false;
 
   @override
   Widget build(BuildContext context) {
@@ -52,10 +41,7 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
         }
 
         if (partnerSnap.hasError) {
-          debugPrint('📋 Firestore error: \${partnerSnap.error}');
-          return const Scaffold(
-            body: Center(child: Text('Erreur Firestore.\nVoir console.')),
-          );
+          return const Scaffold(body: Center(child: Text('Erreur Firestore.')));
         }
 
         final docs = partnerSnap.data?.docs ?? [];
@@ -80,42 +66,43 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
           appBar: AppBar(
             title: const Text('Tableau de bord'),
             backgroundColor: Colors.deepPurple,
-            leading: IconButton(
-              icon: const Icon(Icons.add_business),
-              tooltip: 'Créer une activité',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ManagePartnerPage()),
-                );
-              },
-            ),
             actions: [
-              if (hasActivities)
-                PopupMenuButton<String?>(
-                  onSelected: (id) => setState(() => selectedPartnerId = id),
-                  icon: const Icon(Icons.switch_account),
-                  itemBuilder:
-                      (ctx) => [
-                        const PopupMenuItem(
-                          value: null,
-                          child: Text('Vue globale'),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'new':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ManagePartnerPage(),
                         ),
-                        ...partners.map(
-                          (p) => PopupMenuItem(
-                            value: p['id'],
-                            child: Text(p['name'] ?? ''),
-                          ),
-                        ),
-                      ],
-                ),
+                      );
+                      break;
+                    case 'switch':
+                      _showPartnerSwitchDialog(partners);
+                      break;
+                  }
+                },
+                itemBuilder:
+                    (_) => [
+                      const PopupMenuItem(
+                        value: 'new',
+                        child: Text("Créer une activité"),
+                      ),
+                      const PopupMenuItem(
+                        value: 'switch',
+                        child: Text("Changer d'activité"),
+                      ),
+                    ],
+              ),
             ],
           ),
           body:
               !hasActivities
                   ? const Center(
                     child: Text(
-                      'Crée une activité pour voir les statistiques.',
+                      "Crée une activité pour voir les statistiques.",
                     ),
                   )
                   : FutureBuilder<PartnerStats>(
@@ -126,46 +113,49 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
                       }
 
                       if (statSnap.hasError) {
-                        debugPrint('📋 StatsService error: \${statSnap.error}');
                         return const Center(
-                          child: Text('Erreur lors du chargement des stats.'),
+                          child: Text("Erreur lors du chargement des stats."),
                         );
                       }
 
                       final stats = statSnap.data!;
-                      return Column(
-                        children: [
-                          Expanded(
-                            child: MerchantDashboardPage(
-                              partnerId: selected['id']!,
-                              partnerName: selected['name']!,
-                              bookingsByDay: stats.bookingsByDay,
-                              fillRate: stats.fillRate,
-                              avgRating: stats.avgRating,
-                              allPartners: partners,
-                              onPartnerSelected:
-                                  (id) =>
-                                      setState(() => selectedPartnerId = id),
-                              onShowCalendar:
-                                  () => setState(() => showCalendar = true),
-                            ),
-                          ),
-                          if (showCalendar)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: PartnerSlotsCalendar(
-                                partnerId: selected['id']!,
-                              ),
-                            ),
-                        ],
+                      return MerchantDashboardPage(
+                        partnerId: selected['id']!,
+                        partnerName: selected['name']!,
+                        bookingsByDay: stats.bookingsByDay,
+                        fillRate: stats.fillRate,
+                        avgRating: stats.avgRating,
+                        allPartners: partners,
+                        onPartnerSelected:
+                            (id) => setState(() => selectedPartnerId = id),
                       );
                     },
                   ),
         );
       },
+    );
+  }
+
+  void _showPartnerSwitchDialog(List<Map<String, String>> partners) {
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Changer d’activité'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children:
+                  partners.map((p) {
+                    return ListTile(
+                      title: Text(p['name'] ?? ''),
+                      onTap: () {
+                        setState(() => selectedPartnerId = p['id']);
+                        Navigator.pop(context);
+                      },
+                    );
+                  }).toList(),
+            ),
+          ),
     );
   }
 }

@@ -1,130 +1,106 @@
+// lib/services/firestore/partner_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/partner.dart';
 
-/// Service centralisé pour gérer les activités (Partenaire) et leurs créneaux (slots)
+import '../../models/partner/partner.dart';
+
+/// 🏷 Service centralisé pour la gestion des partenaires
+/// (collection `/partners`), incluant création, lecture, mise à jour et soft-delete.
 class PartnerService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// 🔄 Stream temps réel de tous les partenaires
-  static Stream<List<Partner>> getPartners() {
-    return _firestore.collection('partners').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Partner.fromMap(data, doc.id);
-      }).toList();
-    });
+  /// 🔄 Écoute en temps réel de tous les partenaires actifs.
+  static Stream<List<Partner>> streamPartners() {
+    return _firestore
+        .collection('partners')
+        .where('active', isEqualTo: true)
+        .snapshots()
+        .map(
+          (snap) =>
+              snap.docs
+                  .map((doc) => Partner.fromMap(doc.data(), doc.id))
+                  .toList(),
+        );
   }
 
-  /// ➕ Crée une nouvelle activité
+  /// 📥 Récupère une fois un partenaire par son ID.
+  /// Lève une exception si introuvable.
+  static Future<Partner> getPartnerById(String partnerId) async {
+    final doc = await _firestore.collection('partners').doc(partnerId).get();
+    if (!doc.exists) {
+      throw Exception('Partenaire introuvable (ID: $partnerId)');
+    }
+    return Partner.fromMap(doc.data()!, doc.id);
+  }
+
+  /// ➕ Crée un nouveau partenaire.
+  /// Retourne l'ID du document créé.
   static Future<String> createPartner({
     required String name,
     required String description,
     required String category,
     required double latitude,
     required double longitude,
+    List<String>? photos,
+    double? avgRating,
+    int? reviewsCount,
+    String? geohash,
     int? maxReduction,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('Utilisateur non connecté');
+    if (user == null) {
+      throw Exception('Utilisateur non connecté');
+    }
 
-    final docRef = await _firestore.collection('partners').add({
+    final data = <String, dynamic>{
       'name': name,
       'description': description,
       'category': category,
       'latitude': latitude,
       'longitude': longitude,
-      'ownerId': user.uid,
+      'photos': photos ?? [],
+      'avgRating': avgRating,
+      'reviewsCount': reviewsCount,
+      'geohash': geohash,
       'maxReduction': maxReduction ?? 0,
+      'ownerId': user.uid,
+      'active': true,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
 
-    return docRef.id;
+    final ref = await _firestore.collection('partners').add(data);
+    return ref.id;
   }
 
-  /// ✏️ Met à jour une activité existante
+  /// ✏️ Met à jour partiellement les propriétés d’un partenaire.
+  /// N’inclut pas la modification de ses sous-collections (slots, reviews…).
   static Future<void> updatePartner({
     required String partnerId,
-    required Map<String, dynamic> updatedData,
+    required Map<String, dynamic> updates,
   }) async {
-    await _firestore.collection('partners').doc(partnerId).update(updatedData);
+    await _firestore.collection('partners').doc(partnerId).update(updates);
   }
 
-  /// ➕ Ajoute un créneau à une activité
-  static Future<String> addSlot({
-    required String partnerId,
-    required DateTime startTime,
-    required List<Map<String, dynamic>> reductions,
+  /// 🛑 Désactive (soft-delete) un partenaire en le marquant `active: false`.
+  static Future<void> deactivatePartner(String partnerId) async {
+    await _firestore.collection('partners').doc(partnerId).update({
+      'active': false,
+    });
+  }
+
+  /// 🧑‍💼 Crée un document profil pour l'utilisateur marchand.
+  static Future<void> createUserProfile({
+    required String userId,
+    required String email,
+    required String name,
   }) async {
-    final docRef = await _firestore
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots')
-        .add({
-          'startTime': Timestamp.fromDate(startTime),
-          'reductions': reductions,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-    return docRef.id;
-  }
-
-  /// 🗑 Supprime un créneau spécifique
-  static Future<void> deleteSlot({
-    required String partnerId,
-    required String slotId,
-  }) async {
-    await _firestore
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots')
-        .doc(slotId)
-        .delete();
-  }
-
-  /// 🔁 Met à jour les réductions d’un créneau existant
-  static Future<void> updateSlotReductions({
-    required String partnerId,
-    required String slotId,
-    required List<Map<String, dynamic>> reductions,
-  }) async {
-    await _firestore
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots')
-        .doc(slotId)
-        .update({'reductions': reductions});
-  }
-
-  /// 🔁 Récupère tous les créneaux d’un partenaire
-  static Future<List<Map<String, dynamic>>> getPartnerSlots(
-    String partnerId,
-  ) async {
-    final snapshot =
-        await _firestore
-            .collection('partners')
-            .doc(partnerId)
-            .collection('slots')
-            .orderBy('startTime')
-            .get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        ...data,
-        'id': doc.id,
-        'startTime': data['startTime'],
-        'reductions': List<Map<String, dynamic>>.from(data['reductions'] ?? []),
-      };
-    }).toList();
-  }
-
-  static Future<Partner> getPartnerById(String id) async {
-    final doc = await _firestore.collection('partners').doc(id).get();
-    if (!doc.exists) {
-      throw Exception('Activité introuvable');
-    }
-
-    return Partner.fromMap(doc.data()!, doc.id);
+    // You can choose collection name as you wish; here “users”
+    await _firestore.collection('users').doc(userId).set({
+      'email': email,
+      'name': name,
+      'role': 'merchant',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 }

@@ -1,12 +1,6 @@
-// =============================================================
-// lib/services/firestore/stats_service.dart – v2.1
-// =============================================================
-// 📊 Donne accès aux statistiques clés pour le dashboard commerçant
-// ✅ Ajout du taux de conversion & taux d’annulation (patch champ manquant)
-// -------------------------------------------------------------
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// 📊 Conteneur des statistiques principales pour le dashboard commerçant.
 class PartnerStats {
   final Map<DateTime, int> bookingsByDay;
   final double fillRate;
@@ -19,28 +13,37 @@ class PartnerStats {
   });
 }
 
+/// 👷 Service d’accès aux statistiques Firestore.
 class StatsService {
-  static final _firestore = FirebaseFirestore.instance;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// 📈 Stats principales pour le tableau de bord
+  /// Récupère :
+  ///  • le nombre de réservations par jour sur la dernière semaine,
+  ///  • le taux de remplissage (futurs),
+  ///  • la note moyenne.
   static Future<PartnerStats> getPartnerStats(String partnerId) async {
     final now = DateTime.now();
-    final startWeek = DateTime(now.year, now.month, now.day - 6);
+    final weekAgo = now.subtract(const Duration(days: 6));
 
-    final bookingsSnap =
+    // --- 1) Réservations sur la dernière semaine ---
+    final bookingSnap =
         await _firestore
             .collection('bookings')
             .where('partnerId', isEqualTo: partnerId)
-            .where('startTime', isGreaterThan: Timestamp.fromDate(startWeek))
+            .where(
+              'startTime',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo),
+            )
             .get();
 
     final Map<DateTime, int> bookingsByDay = {};
-    for (final doc in bookingsSnap.docs) {
-      final date = (doc['startTime'] as Timestamp).toDate();
-      final day = DateTime(date.year, date.month, date.day);
-      bookingsByDay.update(day, (v) => v + 1, ifAbsent: () => 1);
+    for (final doc in bookingSnap.docs) {
+      final ts = (doc['startTime'] as Timestamp).toDate();
+      final day = DateTime(ts.year, ts.month, ts.day);
+      bookingsByDay[day] = (bookingsByDay[day] ?? 0) + 1;
     }
 
+    // --- 2) Note moyenne des avis ---
     final reviewsSnap =
         await _firestore
             .collection('partners')
@@ -57,6 +60,7 @@ class StatsService {
       avgRating = total / reviewsSnap.docs.length;
     }
 
+    // --- 3) Taux de remplissage futur ---
     final fillRate = await getFillRate(partnerId);
 
     return PartnerStats(
@@ -66,14 +70,15 @@ class StatsService {
     );
   }
 
-  /// 📊 Calcul du taux de remplissage (réservations / slots à venir)
+  /// Calcul du taux de remplissage = (réservations futures) / (slots futurs).
   static Future<double> getFillRate(String partnerId) async {
-    final now = Timestamp.now();
+    final nowTs = Timestamp.now();
+
     final bookingsSnap =
         await _firestore
             .collection('bookings')
             .where('partnerId', isEqualTo: partnerId)
-            .where('startTime', isGreaterThan: now)
+            .where('startTime', isGreaterThan: nowTs)
             .get();
 
     final slotsSnap =
@@ -81,48 +86,48 @@ class StatsService {
             .collection('partners')
             .doc(partnerId)
             .collection('slots')
-            .where('startTime', isGreaterThan: now)
+            .where('startTime', isGreaterThan: nowTs)
             .get();
 
-    if (slotsSnap.docs.isEmpty) return 0;
-
-    return bookingsSnap.docs.length / slotsSnap.docs.length;
+    final totalSlots = slotsSnap.docs.length;
+    if (totalSlots == 0) return 0.0;
+    return bookingsSnap.docs.length / totalSlots;
   }
 
-  /// 🎯 Taux de conversion : nombre de réservations / nombre de slots
+  /// Taux de conversion global = réservations / total de slots (toutes dates).
   static Future<double> getConversionRate(String partnerId) async {
-    final bookings =
+    final bookingsSnap =
         await _firestore
             .collection('bookings')
             .where('partnerId', isEqualTo: partnerId)
             .get();
 
-    final slots =
+    final slotsSnap =
         await _firestore
             .collection('partners')
             .doc(partnerId)
             .collection('slots')
             .get();
 
-    if (slots.docs.isEmpty) return 0;
-
-    return bookings.docs.length / slots.docs.length;
+    final totalSlots = slotsSnap.docs.length;
+    if (totalSlots == 0) return 0.0;
+    return bookingsSnap.docs.length / totalSlots;
   }
 
-  /// 🚫 Taux d’annulation = bookings avec champ "cancelled": true
+  /// Taux d’annulation = nombre de bookings avec `cancelled == true`.
   static Future<double> getCancelRate(String partnerId) async {
-    final all =
+    final allSnap =
         await _firestore
             .collection('bookings')
             .where('partnerId', isEqualTo: partnerId)
             .get();
 
-    final cancelled = all.docs.where(
-      (d) => d.data().containsKey('cancelled') && d['cancelled'] == true,
-    );
+    final cancelledCount =
+        allSnap.docs
+            .where((d) => (d.data()['cancelled'] ?? false) == true)
+            .length;
 
-    if (all.docs.isEmpty) return 0;
-
-    return cancelled.length / all.docs.length;
+    if (allSnap.docs.isEmpty) return 0.0;
+    return cancelledCount / allSnap.docs.length;
   }
 }

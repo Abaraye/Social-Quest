@@ -1,86 +1,87 @@
-// ===========================================================
-// lib/widgets/partners/manage/header.dart – v2.0
-// ===========================================================
-// 🎯 Composant réutilisable pour créer / modifier une activité
-// 🧠 Affiche dynamiquement le titre et le bouton selon le contexte
-// -----------------------------------------------------------
-
 import 'package:flutter/material.dart';
 
-class ManagePartnerHeader extends StatelessWidget {
+/// Formulaire mutualisé de création/édition de Partner
+class PartnerHeaderForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController descriptionController;
   final String selectedCategory;
   final List<String> categories;
-  final void Function(String?) onCategoryChanged;
-  final VoidCallback onCreate;
-  final bool isEditing; // 👉 Nouveau paramètre pour adapter le header
+  final ValueChanged<String?> onCategoryChanged;
+  final VoidCallback onSubmit;
+  final bool isEditing;
+  final bool isLoading;
 
-  const ManagePartnerHeader({
-    super.key,
+  const PartnerHeaderForm({
+    Key? key,
     required this.formKey,
     required this.nameController,
     required this.descriptionController,
     required this.selectedCategory,
     required this.categories,
     required this.onCategoryChanged,
-    required this.onCreate,
-    this.isEditing = false, // 🔄 Par défaut on considère qu'on est en création
-  });
+    required this.onSubmit,
+    this.isEditing = false,
+    this.isLoading = false,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Form(
       key: formKey,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            isEditing ? "Modifier l'activité" : "Créer une nouvelle activité",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          // Champ nom
           TextFormField(
             controller: nameController,
-            decoration: const InputDecoration(labelText: "Nom de l'activité"),
-            validator: (value) => value!.isEmpty ? "Champ requis" : null,
-          ),
-          const SizedBox(height: 12),
-
-          // Champ description
-          TextFormField(
-            controller: descriptionController,
-            decoration: const InputDecoration(labelText: "Description"),
-            validator: (value) => value!.isEmpty ? "Champ requis" : null,
-          ),
-          const SizedBox(height: 12),
-
-          // Choix de la catégorie
-          DropdownButtonFormField<String>(
-            value: selectedCategory,
-            items:
-                categories
-                    .map(
-                      (cat) => DropdownMenuItem(value: cat, child: Text(cat)),
-                    )
-                    .toList(),
-            onChanged: onCategoryChanged,
-            decoration: const InputDecoration(labelText: "Catégorie"),
+            decoration: const InputDecoration(
+              labelText: 'Nom de l’activité',
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => v == null || v.isEmpty ? 'Nom requis' : null,
           ),
           const SizedBox(height: 16),
-
-          // Bouton de validation
+          TextFormField(
+            controller: descriptionController,
+            decoration: const InputDecoration(
+              labelText: 'Description',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            validator:
+                (v) => v == null || v.isEmpty ? 'Description requise' : null,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: selectedCategory,
+            decoration: const InputDecoration(
+              labelText: 'Catégorie',
+              border: OutlineInputBorder(),
+            ),
+            items:
+                categories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+            onChanged: isLoading ? null : onCategoryChanged,
+          ),
+          const SizedBox(height: 24),
           ElevatedButton.icon(
-            icon: Icon(isEditing ? Icons.save : Icons.add_business),
-            onPressed: onCreate,
+            onPressed: isLoading ? null : onSubmit,
+            icon:
+                isLoading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : Icon(isEditing ? Icons.save : Icons.add),
+            label: Text(isEditing ? 'Enregistrer' : 'Créer'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
               minimumSize: const Size.fromHeight(50),
             ),
-            label: Text(isEditing ? "Modifier l'activité" : "Créer l'activité"),
           ),
         ],
       ),

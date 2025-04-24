@@ -1,80 +1,81 @@
 // lib/widgets/booking/booking_button.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mvp_social_quest/services/firestore/booking_service.dart';
+import '../../models/reduction.dart';
+import '../../services/firestore/booking_service.dart';
 
-/// 🟣 Bouton de réservation d’un créneau spécifique avec une réduction
+/// 🟢 Bouton pour réserver un créneau.
+/// Délégué BookingService pour la logique métier.
 class BookingButton extends StatefulWidget {
   final String partnerId;
   final String slotId;
-  final Map<String, dynamic> selectedReduction;
+  final Reduction selectedReduction;
   final DateTime startTime;
 
   const BookingButton({
-    super.key,
+    Key? key,
     required this.partnerId,
     required this.slotId,
     required this.selectedReduction,
     required this.startTime,
-  });
+  }) : super(key: key);
 
   @override
   State<BookingButton> createState() => _BookingButtonState();
 }
 
 class _BookingButtonState extends State<BookingButton> {
-  bool isLoading = false;
+  bool _isLoading = false;
+  bool _isBooked = false;
 
   Future<void> _bookSlot() async {
-    setState(() => isLoading = true);
+    if (_isBooked) return;
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       await BookingService.createBooking(
         partnerId: widget.partnerId,
         slotId: widget.slotId,
-        selectedReduction: {
-          ...widget.selectedReduction,
-          'startTime': Timestamp.fromDate(widget.startTime),
-        },
+        occurrence: widget.startTime,
+        selectedReduction: widget.selectedReduction.toMap(),
       );
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réservation confirmée ✅')),
+          const SnackBar(content: Text('Réservation confirmée 🎉')),
         );
+        setState(() {
+          _isBooked = true;
+        });
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Erreur : ${e.toString()}')));
+        ).showSnackBar(SnackBar(content: Text('Erreur : $error')));
       }
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: isLoading ? null : _bookSlot,
+      onPressed: (_isLoading || _isBooked) ? null : _bookSlot,
       icon:
-          isLoading
+          _isLoading
               ? const SizedBox(
-                height: 16,
                 width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: Colors.white,
                 ),
               )
               : const Icon(Icons.check_circle),
-      label: const Text("Réserver ce créneau"),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(48),
-      ),
+      label: Text(_isBooked ? 'Déjà réservé' : 'Réserver ce créneau'),
+      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
     );
   }
 }

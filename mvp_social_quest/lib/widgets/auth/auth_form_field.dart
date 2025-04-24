@@ -1,4 +1,3 @@
-// lib/widgets/auth/auth_form_field.dart
 import 'package:flutter/material.dart';
 
 /// Un champ de formulaire personnalisé pour les pages d'authentification.
@@ -9,17 +8,17 @@ class AuthFormField extends StatelessWidget {
   final String? Function(String?)? validator;
   final bool obscureText;
   final TextInputType keyboardType;
-  final IconData? icon;
+  final IconData? icon; // on réintroduit l’icône
 
   const AuthFormField({
-    super.key,
+    Key? key,
     required this.controller,
     required this.label,
     this.validator,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
-    this.icon,
-  });
+    this.icon, // nommé
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +31,7 @@ class AuthFormField extends StatelessWidget {
           (value) => value == null || value.isEmpty ? 'Champ requis' : null,
       decoration: InputDecoration(
         labelText: label,
+        // si on a une icône, on la met en prefix
         prefixIcon: icon != null ? Icon(icon) : null,
         border: const OutlineInputBorder(),
       ),

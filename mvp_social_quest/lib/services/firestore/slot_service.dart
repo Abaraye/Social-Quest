@@ -1,200 +1,156 @@
-// =============================================================
-// lib/services/firestore/slot_service.dart – v3.1
-// =============================================================
-// 🔄 Gère les slots avec support des créneaux récurrents
-// ✅ Nouvelle méthode : getExpandedPartnerSlots()
-// -------------------------------------------------------------
+import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/slot.dart';
+import 'recurrence_helper.dart';
+
+/// ⏰ Service de gestion des créneaux (collection `/partners/{pid}/slots`).
 class SlotService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final Uuid _uuid = Uuid();
 
-  /// 🔍 Récupère tous les créneaux (simples ou récurrents)
-  static Future<List<Map<String, dynamic>>> getPartnerSlots(
-    String partnerId,
-  ) async {
-    final snapshot =
-        await _firestore
-            .collection('partners')
-            .doc(partnerId)
-            .collection('slots')
-            .orderBy('startTime')
-            .get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        'id': doc.id,
-        'startTime': data['startTime'],
-        'reductions': List<Map<String, dynamic>>.from(data['reductions'] ?? []),
-        'recurrence': data['recurrence'],
-        'recurrenceGroupId': data['recurrenceGroupId'],
-      };
-    }).toList();
+  /// 📥 Flux temps réel des slots bruts (templates + one-off).
+  static Stream<List<Slot>> streamRawSlots(String partnerId) {
+    return _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots')
+        .orderBy('startTime')
+        .snapshots()
+        .map(
+          (snap) =>
+              snap.docs
+                  .map((d) => Slot.fromMap({...d.data(), 'id': d.id}))
+                  .toList(),
+        );
   }
 
-  /// 🔍 Récupère et étend les créneaux récurrents (pour affichage utilisateur)
-  static Future<List<Map<String, dynamic>>> getExpandedPartnerSlots(
-    String partnerId,
-  ) async {
-    final slots = await getPartnerSlots(partnerId);
-    final now = DateTime.now();
-
-    final expanded = <Map<String, dynamic>>[];
-
-    for (final slot in slots) {
-      final start = (slot['startTime'] as Timestamp).toDate();
-      final recurrence = slot['recurrence'] as Map<String, dynamic>?;
-
-      if (recurrence == null || recurrence['type'] == 'Aucune') {
-        if (start.isAfter(now)) expanded.add(slot);
-        continue;
+  /// 🔄 Flux temps réel des occurrences étendues (applique récurrence + exceptions).
+  static Stream<List<Slot>> streamExpandedSlots(String partnerId) {
+    return streamRawSlots(partnerId).map((rawSlots) {
+      final now = DateTime.now();
+      final expanded = <Slot>[];
+      for (final slot in rawSlots) {
+        expanded.addAll(RecurrenceHelper.expand(slot, now: now));
       }
-
-      final type = recurrence['type'];
-      final endDate = (recurrence['endDate'] as Timestamp?)?.toDate() ?? start;
-      DateTime current = start;
-
-      while (!current.isAfter(endDate)) {
-        if (current.isAfter(now)) {
-          expanded.add({
-            'id': slot['id'],
-            'startTime': Timestamp.fromDate(current),
-            'reductions': slot['reductions'],
-            'recurrenceGroupId': slot['recurrenceGroupId'],
-            'originalStartTime': slot['startTime'],
-          });
-        }
-
-        switch (type) {
-          case 'Tous les jours':
-            current = current.add(const Duration(days: 1));
-            break;
-          case 'Chaque semaine':
-          case 'Tous les lundis':
-            current = current.add(const Duration(days: 7));
-            break;
-          default:
-            break;
-        }
-      }
-    }
-
-    // Tri par date
-    expanded.sort((a, b) {
-      final at = (a['startTime'] as Timestamp).toDate();
-      final bt = (b['startTime'] as Timestamp).toDate();
-      return at.compareTo(bt);
+      expanded.sort((a, b) => a.startTime.compareTo(b.startTime));
+      return expanded;
     });
-
-    return expanded;
   }
 
-  /// ➕ Ajoute un ou plusieurs créneaux selon récurrence
-  static Future<void> addSlot(
-    String partnerId,
-    Map<String, dynamic> slotData,
-  ) async {
-    final recurrence = slotData['recurrence'] as Map<String, dynamic>?;
-    final reductions = List<Map<String, dynamic>>.from(slotData['reductions']);
-    final startTime = (slotData['startTime'] as Timestamp).toDate();
-    final duration = slotData['duration'] as int;
-    final recurrenceGroupId = const Uuid().v4();
+  /// 📖 Lecture unique de la liste étendue des créneaux.
+  static Future<List<Slot>> getExpandedSlots(String partnerId) async {
+    return await streamExpandedSlots(partnerId).first;
+  }
 
-    if (recurrence == null || recurrence['type'] == 'Aucune') {
-      await _firestore
-          .collection('partners')
-          .doc(partnerId)
-          .collection('slots')
-          .add(slotData);
-      return;
-    }
+  /// 🏷 Alias (déprécié) pour compatibilité ascendante.
+  @Deprecated('Use getExpandedSlots() instead')
+  static Future<List<Slot>> getExpandedPartnerSlots(String partnerId) {
+    return getExpandedSlots(partnerId);
+  }
 
-    final type = recurrence['type'];
-    final endDate =
-        (recurrence['endDate'] as Timestamp?)?.toDate() ?? startTime;
-    DateTime current = startTime;
+  /// ➕ Ajoute un template de créneau (récurrent ou non).
+  static Future<void> addSlot(String partnerId, Slot slot) async {
+    final col = _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots');
 
-    while (!current.isAfter(endDate)) {
-      await _firestore
-          .collection('partners')
-          .doc(partnerId)
-          .collection('slots')
-          .add({
-            'startTime': Timestamp.fromDate(current),
-            'duration': duration,
-            'reductions': reductions,
-            'recurrence': recurrence,
-            'recurrenceGroupId': recurrenceGroupId,
+    final data =
+        slot.toMap()
+          ..remove('id')
+          ..addAll({
             'createdAt': FieldValue.serverTimestamp(),
-            'isRecurring': true,
+            if (slot.recurrence != null) 'recurrenceGroupId': _uuid.v4(),
           });
 
-      switch (type) {
-        case 'Tous les jours':
-          current = current.add(const Duration(days: 1));
-          break;
-        case 'Chaque semaine':
-        case 'Tous les lundis':
-          current = current.add(const Duration(days: 7));
-          break;
-        default:
-          return;
-      }
-    }
+    await col.add(data);
   }
 
-  /// ✏️ Mise à jour des réductions d’un créneau
-  static Future<void> updateSlotReductions(
+  /// 🔒 Bloque une occurrence d’un slot récurrent.
+  static Future<void> blockOccurrence(
+    String partnerId,
+    Slot template,
+    DateTime occurrence,
+  ) async {
+    await deleteSingleOccurrence(partnerId, template.id, occurrence);
+    await addInstanceSlot(
+      partnerId,
+      template.copyWith(startTime: occurrence),
+      reserved: true,
+    );
+  }
+
+  /// ✔️ Marque un slot unique comme réservé.
+  static Future<void> markReserved(String partnerId, String slotId) async {
+    await _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots')
+        .doc(slotId)
+        .update({'reserved': true});
+  }
+
+  /// ➕ Ajoute un slot one-off (instance), avec option `reserved`.
+  static Future<void> addInstanceSlot(
+    String partnerId,
+    Slot slot, {
+    bool reserved = false,
+  }) async {
+    final col = _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots');
+
+    final data = {
+      ...slot.toMap()..remove('id'),
+      'reserved': reserved,
+      'recurrence': null,
+      'recurrenceGroupId': null,
+      'exceptions': <Timestamp>[],
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+    await col.add(data);
+  }
+
+  /// ✏️ Met à jour un template ou une instance de slot.
+  static Future<void> updateSlot({
+    required String partnerId,
+    required String slotId,
+    required Map<String, dynamic> updates,
+  }) {
+    return _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots')
+        .doc(slotId)
+        .update(updates);
+  }
+
+  /// 🚫 Ajoute une date à `exceptions` pour un template récurrent.
+  static Future<void> deleteSingleOccurrence(
     String partnerId,
     String slotId,
-    List<Map<String, dynamic>> reductions,
-  ) async {
-    await _firestore
+    DateTime occurrence,
+  ) {
+    return _firestore
         .collection('partners')
         .doc(partnerId)
         .collection('slots')
         .doc(slotId)
-        .update({'reductions': reductions});
+        .update({
+          'exceptions': FieldValue.arrayUnion([Timestamp.fromDate(occurrence)]),
+        });
   }
 
-  /// 🔁 Mise à jour groupée des créneaux d’une récurrence
-  static Future<void> updateRecurrenceGroup(
-    String partnerId,
-    String recurrenceGroupId,
-    Map<String, dynamic> updates,
-  ) async {
-    final group =
-        await _firestore
-            .collection('partners')
-            .doc(partnerId)
-            .collection('slots')
-            .where('recurrenceGroupId', isEqualTo: recurrenceGroupId)
-            .get();
-
-    for (final doc in group.docs) {
-      await doc.reference.update(updates);
-    }
-  }
-
-  /// 🗑️ Supprime un seul créneau
-  static Future<void> deleteSlot(String partnerId, String slotId) async {
-    await _firestore
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots')
-        .doc(slotId)
-        .delete();
-  }
-
-  /// 🗑️ Supprime toute une récurrence via recurrenceGroupId
+  /// 🗑 Supprime tout le groupe de récurrence.
   static Future<void> deleteRecurrenceGroup(
     String partnerId,
     String recurrenceGroupId,
   ) async {
-    final group =
+    final query =
         await _firestore
             .collection('partners')
             .doc(partnerId)
@@ -202,7 +158,7 @@ class SlotService {
             .where('recurrenceGroupId', isEqualTo: recurrenceGroupId)
             .get();
 
-    for (final doc in group.docs) {
+    for (final doc in query.docs) {
       await doc.reference.delete();
     }
   }

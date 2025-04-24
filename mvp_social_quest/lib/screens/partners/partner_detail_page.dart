@@ -1,73 +1,54 @@
+// lib/screens/partners/partner_detail_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../models/partner.dart';
+import '../../models/slot.dart';
+import '../../models/partner/partner.dart';
+import '../../models/reduction.dart'; // ← import ajouté
 import '../../services/firestore/slot_service.dart';
 import '../../services/firestore/booking_service.dart';
+import '../../widgets/common/rounded_button.dart';
 
-/// 🧾 Page de détail d’un partenaire (activité)
-/// Affiche la description, les créneaux disponibles, les réductions
-/// Permet à l’utilisateur de réserver un créneau avec une réduction
+/// 📋 Détail d’une activité + prise de réservation
+/// Affiche la liste de créneaux (récurrents étendus) et gère la réservation.
 class PartnerDetailPage extends StatefulWidget {
   final Partner partner;
 
-  const PartnerDetailPage({super.key, required this.partner});
+  const PartnerDetailPage({Key? key, required this.partner}) : super(key: key);
 
   @override
   State<PartnerDetailPage> createState() => _PartnerDetailPageState();
 }
 
 class _PartnerDetailPageState extends State<PartnerDetailPage> {
-  List<Map<String, dynamic>> slots = [];
-  Map<String, dynamic>? selectedSlot;
-  Map<String, dynamic>? selectedReduction;
-
-  bool isLoading = true;
+  late Future<List<Slot>> _slotsFuture;
+  Slot? _selectedSlot;
+  Reduction? _selectedReduction;
 
   @override
   void initState() {
     super.initState();
-    _loadSlots(); // Chargement initial des créneaux
+    // On charge en une fois la liste des occurrences à venir
+    _slotsFuture = SlotService.getExpandedSlots(widget.partner.id);
   }
 
-  /// 🔁 Récupère les créneaux disponibles depuis Firebase (y compris récurrents)
-  Future<void> _loadSlots() async {
-    final fetchedSlots = await SlotService.getExpandedPartnerSlots(
-      widget.partner.id,
-    );
-    setState(() {
-      slots = fetchedSlots;
-      isLoading = false;
-    });
-  }
-
-  /// 🧮 Formatte une réduction pour affichage
-  String _formatReduction(Map<String, dynamic> r) {
-    final amount = r['amount'];
-    final groupSize = r['groupSize'];
-    return "-$amount% dès $groupSize personne${groupSize > 1 ? 's' : ''}";
-  }
-
-  /// ✅ Effectue la réservation en appelant BookingService et affiche une confirmation
   Future<void> _confirmReservation() async {
-    final slotId = selectedSlot!['id'];
-
+    final slot = _selectedSlot!;
+    final red = _selectedReduction!;
     await BookingService.createBooking(
       partnerId: widget.partner.id,
-      slotId: slotId,
-      selectedReduction: selectedReduction!,
+      slotId: slot.id,
+      occurrence: slot.startTime,
+      selectedReduction: red.toMap(),
     );
 
-    // 🎉 Affichage d’un bottom sheet de confirmation
-    final formatted = DateFormat(
-      'dd/MM/yyyy - HH:mm',
-    ).format((selectedSlot!['startTime'] as Timestamp).toDate());
-
+    final when = DateFormat('dd/MM/yyyy – HH:mm').format(slot.startTime);
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder:
           (_) => Padding(
@@ -76,26 +57,19 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "Réservation Confirmée 🎉",
-                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  'Réservation Confirmée 🎉',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  '${widget.partner.name}\n$formatted\n${_formatReduction(selectedReduction!)}',
+                  '${widget.partner.name}\n$when\n'
+                  '-${red.amount}% dès ${red.groupSize} pers',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton(
+                const SizedBox(height: 16),
+                RoundedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    minimumSize: const Size.fromHeight(50),
-                  ),
-                  child: const Text(
-                    'Fermer',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: const Text('Fermer'),
                 ),
               ],
             ),
@@ -110,109 +84,106 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
         title: Text(widget.partner.name),
         backgroundColor: Colors.deepPurple,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child:
-            isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 📝 Description de l’activité
-                    Text(
-                      widget.partner.description,
-                      style: const TextStyle(fontSize: 16, height: 1.4),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 🕒 Sélection des créneaux disponibles
-                    const Text(
-                      '🕒 Créneaux disponibles',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children:
-                          slots.map((slot) {
-                            final timestamp = slot['startTime'] as Timestamp;
-                            final formatted = DateFormat(
-                              'dd/MM/yyyy - HH:mm',
-                            ).format(timestamp.toDate());
-                            return ChoiceChip(
-                              label: Text(formatted),
-                              selected: selectedSlot == slot,
-                              selectedColor: Colors.deepPurple.shade100,
-                              onSelected: (_) {
-                                setState(() {
-                                  selectedSlot = slot;
-                                  selectedReduction = null;
-                                });
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 🎁 Réductions disponibles pour le créneau sélectionné
-                    if (selectedSlot?['reductions'] != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '🎁 Réductions disponibles',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            children: List<Widget>.from(
-                              (selectedSlot!['reductions'] as List).map((r) {
-                                return ChoiceChip(
-                                  label: Text(_formatReduction(r)),
-                                  selected: selectedReduction == r,
-                                  onSelected:
-                                      (_) =>
-                                          setState(() => selectedReduction = r),
-                                );
-                              }),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                    const Spacer(),
-
-                    // ✅ Bouton de réservation
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(
-                          Icons.check_circle,
-                          color: Colors.white,
-                        ),
-                        onPressed:
-                            selectedSlot != null && selectedReduction != null
-                                ? _confirmReservation
-                                : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              selectedSlot != null && selectedReduction != null
-                                  ? Colors.green
-                                  : Colors.grey.shade400,
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                        label: const Text('Réserver'),
-                      ),
-                    ),
-                  ],
+      body: FutureBuilder<List<Slot>>(
+        future: _slotsFuture,
+        builder: (ctx, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final slots =
+              snap.data!..sort((a, b) => a.startTime.compareTo(b.startTime));
+          if (slots.isEmpty) {
+            return const Center(child: Text('Aucun créneau disponible.'));
+          }
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '📅 Sélectionnez un créneau',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
+                const SizedBox(height: 8),
+
+                // Liste horizontale de ChoiceChips pour les dates
+                SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: slots.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final slot = slots[i];
+                      final label = DateFormat(
+                        'dd/MM • HH:mm',
+                      ).format(slot.startTime);
+                      return ChoiceChip(
+                        label: Text(label),
+                        selected: _selectedSlot == slot,
+                        onSelected:
+                            (_) => setState(() {
+                              _selectedSlot = slot;
+                              _selectedReduction = null;
+                            }),
+                      );
+                    },
+                  ),
+                ),
+
+                // Sélection de la réduction
+                if (_selectedSlot?.reductions.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 16),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '🎁 Choisissez une réduction',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children:
+                        _selectedSlot!.reductions.map((r) {
+                          final label = '-${r.amount}% dès ${r.groupSize}p';
+                          return ChoiceChip(
+                            label: Text(label),
+                            selected: _selectedReduction == r,
+                            onSelected:
+                                (_) => setState(() => _selectedReduction = r),
+                          );
+                        }).toList(),
+                  ),
+                ],
+
+                const Spacer(),
+
+                // Bouton Réserver
+                RoundedButton(
+                  onPressed:
+                      (_selectedSlot != null && _selectedReduction != null)
+                          ? _confirmReservation
+                          : null,
+                  child: Text(
+                    'Réserver',
+                    style: TextStyle(
+                      color:
+                          (_selectedSlot != null && _selectedReduction != null)
+                              ? Colors.white
+                              : Colors.grey.shade400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

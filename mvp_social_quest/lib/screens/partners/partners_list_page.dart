@@ -1,113 +1,78 @@
-// =============================================================
-// lib/screens/partners/partners_list_page.dart  – v3.1
-// =============================================================
-// Correctif : tri par réduction (du + fort  ➜  + faible)
-//  • compareTo inversé  (b vs a)  ⇒  (a, b) => b.maxReductionDisplay - a.max …
-//  • Tri par nom inchangé
-// -------------------------------------------------------------
-
 import 'package:flutter/material.dart';
-import 'package:mvp_social_quest/models/partner.dart';
+import 'package:mvp_social_quest/models/partner/partner.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
 import 'package:mvp_social_quest/services/firestore/partner_service.dart';
 import 'package:mvp_social_quest/services/firestore/favorites_service.dart';
 import '../../widgets/partners/partner_card.dart';
+import '../../widgets/common/filter_bar.dart';
+import '../../widgets/common/sort_dropdown.dart';
 
+/// 🌍 Liste des activités autour de moi
+/// Recherches, filtres par catégorie, tri et favoris.
 class PartnersListPage extends StatefulWidget {
-  const PartnersListPage({super.key});
+  const PartnersListPage({Key? key}) : super(key: key);
 
   @override
   State<PartnersListPage> createState() => _PartnersListPageState();
 }
 
 class _PartnersListPageState extends State<PartnersListPage> {
-  String searchQuery = '';
-  Set<String> selectedCategories = {}; // multi‑sélection
-  String sortBy = 'nom';
-
-  bool _isCatSelected(String c) => selectedCategories.contains(c);
-
-  void _toggleCategory(String cat) {
-    setState(() {
-      if (cat == '__all__') {
-        selectedCategories.clear();
-      } else {
-        if (selectedCategories.contains(cat)) {
-          selectedCategories.remove(cat);
-        } else {
-          selectedCategories.add(cat);
-        }
-      }
-    });
-  }
+  String _searchQuery = '';
+  Set<String> _selectedCats = {};
+  String _sortBy = 'nom';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Activités autour de moi'),
-        backgroundColor: Colors.deepPurple,
-      ),
+      appBar: AppBar(title: const Text('Activités autour de moi')),
       body: Column(
         children: [
-          // 🔎 BARRE DE RECHERCHE
+          // barre de recherche
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(12),
             child: TextField(
               decoration: const InputDecoration(
-                labelText: 'Rechercher une activité',
-                border: OutlineInputBorder(),
+                labelText: 'Rechercher',
                 prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
               ),
-              onChanged: (v) => setState(() => searchQuery = v.toLowerCase()),
+              onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             ),
           ),
-          // 📡 STREAM FAVORIS -> STREAM PARTENAIRES
+
           Expanded(
             child: StreamBuilder<List<String>>(
               stream: FavoritesService.favoriteIdsStream(),
-              builder: (context, favSnap) {
+              builder: (ctx, favSnap) {
                 final favIds = favSnap.data ?? [];
                 return StreamBuilder<List<Partner>>(
-                  stream: PartnerService.getPartners(),
-                  builder: (context, snap) {
+                  stream: PartnerService.streamPartners(),
+                  builder: (ctx, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    if (!snap.hasData || snap.data!.isEmpty) {
-                      return const Center(
-                        child: Text('Aucune activité trouvée.'),
-                      );
-                    }
+                    final all = snap.data ?? [];
 
-                    // Liste brute
-                    var partners = snap.data!;
+                    // Catégories dynamiques
+                    final cats = all.map((p) => p.category).toSet();
 
-                    // ---- CATEGORIES DYNAMIQUES ----
-                    final cats =
-                        partners
-                            .map((p) => p.category)
-                            .where((c) => c.isNotEmpty)
-                            .toSet();
-
-                    // ---- FILTRES ----
-                    partners =
-                        partners.where((p) {
-                          final matchQuery = p.name.toLowerCase().contains(
-                            searchQuery,
+                    // Filtrage texte + catégorie
+                    var filtered =
+                        all.where((p) {
+                          final matchText = p.name.toLowerCase().contains(
+                            _searchQuery,
                           );
                           final matchCat =
-                              selectedCategories.isEmpty ||
-                              selectedCategories.contains(p.category);
-                          return matchQuery && matchCat;
+                              _selectedCats.isEmpty ||
+                              _selectedCats.contains(p.category);
+                          return matchText && matchCat;
                         }).toList();
 
-                    // ---- TRI ----
-                    if (sortBy == 'nom') {
-                      partners.sort((a, b) => a.name.compareTo(b.name));
-                    } else if (sortBy == 'reduction') {
-                      // du plus GRAND pourcentage vers le plus petit
-                      partners.sort(
+                    // Tri
+                    if (_sortBy == 'nom') {
+                      filtered.sort((a, b) => a.name.compareTo(b.name));
+                    } else {
+                      filtered.sort(
                         (a, b) => b.maxReductionDisplay.compareTo(
                           a.maxReductionDisplay,
                         ),
@@ -116,98 +81,85 @@ class _PartnersListPageState extends State<PartnersListPage> {
 
                     return Column(
                       children: [
-                        // ----- ROW CATEGORIES -----
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              ChoiceChip(
-                                label: const Text('Tous'),
-                                selected: selectedCategories.isEmpty,
-                                onSelected: (_) => _toggleCategory('__all__'),
-                              ),
-                              const SizedBox(width: 8),
-                              ...cats.map(
-                                (cat) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ChoiceChip(
-                                    label: Text(cat),
-                                    selected: _isCatSelected(cat),
-                                    onSelected: (_) => _toggleCategory(cat),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // ----- DROPDOWN TRI -----
+                        // Barres de filtre & tri
                         Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: DropdownButtonFormField<String>(
-                            value: sortBy,
-                            decoration: const InputDecoration(
-                              labelText: 'Trier par',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'nom',
-                                child: Text('Nom'),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Column(
+                            children: [
+                              FilterBar(
+                                options: cats.toList()..sort(),
+                                selected: _selectedCats,
+                                onToggle: (cat) {
+                                  setState(() {
+                                    if (cat == '__all__') {
+                                      _selectedCats.clear();
+                                    } else if (!_selectedCats.remove(cat)) {
+                                      _selectedCats.add(cat);
+                                    }
+                                  });
+                                },
                               ),
-                              DropdownMenuItem(
-                                value: 'reduction',
-                                child: Text('Réduction'),
-                              ),
-                              // DropdownMenuItem(value: 'distance', child: Text('Distance')), // TODO: geo
-                            ],
-                            onChanged:
-                                (v) => setState(() => sortBy = v ?? 'nom'),
-                          ),
-                        ),
-                        // ----- LISTE PARTNERS -----
-                        Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: partners.length,
-                            itemBuilder: (_, i) {
-                              final partner = partners[i];
-                              final isFav = FavoritesService.isFavoritedSync(
-                                favIds,
-                                partner.id,
-                              );
-                              return PartnerCard(
-                                partner: partner,
-                                isFavorite: isFav,
-                                onFavoriteToggle: () async {
-                                  await FavoritesService.toggleFavorite(
-                                    partner.id,
-                                  );
-                                  final action =
-                                      isFav
-                                          ? 'retiré des favoris'
-                                          : 'ajouté aux favoris';
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '${partner.name} $action',
-                                        ),
-                                      ),
-                                    );
+                              const SizedBox(height: 8),
+                              SortDropdown<String>(
+                                label: 'Trier par',
+                                value: _sortBy,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'nom',
+                                    child: Text('Nom'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'reduction',
+                                    child: Text('Réduction'),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    setState(() => _sortBy = v);
                                   }
                                 },
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => PartnerDetailPage(
-                                            partner: partner,
-                                          ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const Divider(height: 1),
+
+                        // Liste des partenaires
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: filtered.length,
+                            separatorBuilder:
+                                (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (ctx, i) {
+                              final p = filtered[i];
+                              final isFav = favIds.contains(p.id);
+                              return PartnerCard(
+                                partner: p,
+                                isFavorite: isFav,
+                                onFavoriteToggle: () async {
+                                  await FavoritesService.toggleFavorite(p.id);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isFav
+                                            ? '${p.name} retiré des favoris'
+                                            : '${p.name} ajouté aux favoris',
+                                      ),
                                     ),
                                   );
                                 },
+                                onTap:
+                                    () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (_) =>
+                                                PartnerDetailPage(partner: p),
+                                      ),
+                                    ),
                               );
                             },
                           ),

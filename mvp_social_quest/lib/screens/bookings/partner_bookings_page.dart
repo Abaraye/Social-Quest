@@ -1,82 +1,77 @@
-// =============================================================
-// lib/screens/bookings/partner_bookings_page.dart – v1.1
-// =============================================================
-// ✅ Affiche les réservations à venir pour une activité commerçante
-// -------------------------------------------------------------
-
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/booking.dart';
+import '../../services/firestore/booking_service.dart';
+
+/// Affiche la liste des réservations pour un partenaire donné.
 class PartnerBookingsPage extends StatelessWidget {
   final String partnerId;
-
-  const PartnerBookingsPage({super.key, required this.partnerId});
+  const PartnerBookingsPage({Key? key, required this.partnerId})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-
-    final bookingsQuery = FirebaseFirestore.instance
-        .collection('bookings')
-        .where('partnerId', isEqualTo: partnerId)
-        .where('startTime', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
-        .orderBy('startTime');
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Réservations à venir"),
+        title: const Text('Réservations du partenaire'),
         backgroundColor: Colors.deepPurple,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: bookingsQuery.snapshots(),
+      body: StreamBuilder<List<Booking>>(
+        stream: BookingService.streamForPartner(partnerId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          if (snapshot.hasError) {
-            return const Center(child: Text("Erreur lors du chargement."));
-          }
-
-          final bookings = snapshot.data?.docs ?? [];
-
+          final bookings = snapshot.data ?? [];
           if (bookings.isEmpty) {
             return const Center(
-              child: Text(
-                "Aucune réservation à venir.",
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: Text('Aucune réservation', style: TextStyle(fontSize: 16)),
             );
           }
-
+          // Trie par date
+          bookings.sort((a, b) => a.occurrence.compareTo(b.occurrence));
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: bookings.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final data = bookings[i].data() as Map<String, dynamic>;
-              final startTime = (data['startTime'] as Timestamp).toDate();
-              final formattedTime = DateFormat(
-                'EEEE dd MMM – HH:mm',
-                'fr_FR',
-              ).format(startTime);
-
-              final userId = data['userId'] ?? 'Client inconnu';
-              final reduction = data['reductionChosen']?['amount'] ?? 0;
-              final groupSize = data['reductionChosen']?['groupSize'] ?? '?';
-
-              return Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            separatorBuilder: (_, __) => const Divider(),
+            itemBuilder: (context, index) {
+              final b = bookings[index];
+              final dateStr = DateFormat(
+                'dd/MM/yyyy – HH:mm',
+              ).format(b.occurrence);
+              return ListTile(
+                title: Text(dateStr),
+                subtitle: Text(
+                  '-${b.reductionChosen.amount}% dès ${b.reductionChosen.groupSize} pers',
                 ),
-                child: ListTile(
-                  leading: const Icon(Icons.event, color: Colors.deepPurple),
-                  title: Text(formattedTime),
-                  subtitle: Text(
-                    "Client : $userId\nRéduction : -$reduction% (groupe de $groupSize)",
-                    style: const TextStyle(height: 1.4),
-                  ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder:
+                          (_) => AlertDialog(
+                            title: const Text('Annuler cette réservation ?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Non'),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Oui'),
+                              ),
+                            ],
+                          ),
+                    );
+                    if (confirmed == true) {
+                      await BookingService.deleteBooking(b.id);
+                    }
+                  },
                 ),
               );
             },

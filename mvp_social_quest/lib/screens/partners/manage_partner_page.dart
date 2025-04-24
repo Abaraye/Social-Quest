@@ -1,20 +1,15 @@
-// =============================================================
-// lib/screens/partners/manage_partner_page.dart – v2.4
-// =============================================================
-// ✨ Page permettant de créer, modifier ou supprimer une activité commerçante
-// 🧼 Corrige le bug `setState after dispose`
-// ✅ Redirige vers le dashboard commerçant après création ou suppression
-// -------------------------------------------------------------
+// lib/screens/partners/manage_partner_page.dart
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../widgets/partners/manage/header.dart';
+import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/widgets/common/delete_button.dart';
+import 'package:mvp_social_quest/widgets/partners/manage/header.dart';
 
+/// 🧩 Page création / édition d’une activité commerçant.
+/// Si [partnerId] == null ⇒ création, sinon édition.
 class ManagePartnerPage extends StatefulWidget {
   final String? partnerId;
-
-  const ManagePartnerPage({super.key, this.partnerId});
+  const ManagePartnerPage({Key? key, this.partnerId}) : super(key: key);
 
   @override
   State<ManagePartnerPage> createState() => _ManagePartnerPageState();
@@ -24,9 +19,8 @@ class _ManagePartnerPageState extends State<ManagePartnerPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  String _selectedCat = 'Cuisine';
-
-  final _cats = [
+  String _selectedCategory = 'Cuisine';
+  final List<String> _categories = [
     'Cuisine',
     'Sport',
     'Culture',
@@ -37,112 +31,100 @@ class _ManagePartnerPageState extends State<ManagePartnerPage> {
   ];
 
   bool _isLoading = false;
-  bool _isEditMode = false;
+  bool get _isEditMode => widget.partnerId != null;
 
   @override
   void initState() {
     super.initState();
-    if (widget.partnerId != null) {
-      _loadPartnerData();
-    }
+    if (_isEditMode) _loadExistingPartner();
   }
 
-  Future<void> _loadPartnerData() async {
+  Future<void> _loadExistingPartner() async {
     setState(() => _isLoading = true);
-    final doc =
-        await FirebaseFirestore.instance
-            .collection('partners')
-            .doc(widget.partnerId)
-            .get();
-
-    if (!mounted) return;
-
-    if (doc.exists) {
-      final d = doc.data()!;
-      _nameCtrl.text = d['name'] ?? '';
-      _descCtrl.text = d['description'] ?? '';
-      _selectedCat = d['category'] ?? 'Cuisine';
-      setState(() => _isEditMode = true);
+    try {
+      final p = await PartnerService.getPartnerById(widget.partnerId!);
+      // On utilise directement les getters exposés
+      _nameCtrl.text = p.name;
+      _descCtrl.text = p.description;
+      _selectedCategory = p.category;
+    } catch (e) {
+      debugPrint('⚠️ chargement partenaire : $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
   }
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final data = {
-      'ownerId': user.uid,
-      'name': _nameCtrl.text.trim(),
-      'description': _descCtrl.text.trim(),
-      'category': _selectedCat,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
     setState(() => _isLoading = true);
 
-    if (_isEditMode && widget.partnerId != null) {
-      await FirebaseFirestore.instance
-          .collection('partners')
-          .doc(widget.partnerId)
-          .update(data);
-    } else {
-      await FirebaseFirestore.instance.collection('partners').add(data);
-      _nameCtrl.clear();
-      _descCtrl.clear();
+    final data = {
+      'name': _nameCtrl.text.trim(),
+      'description': _descCtrl.text.trim(),
+      'category': _selectedCategory,
+    };
+
+    try {
+      if (_isEditMode) {
+        await PartnerService.updatePartner(
+          partnerId: widget.partnerId!,
+          updates: data,
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Activité mise à jour ✅')));
+      } else {
+        await PartnerService.createPartner(
+          name: data['name']!,
+          description: data['description']!,
+          category: data['category']!,
+          latitude: 0.0,
+          longitude: 0.0,
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Activité créée 🎉')));
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint('⚠️ sauvegarde partenaire : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur lors de l’enregistrement')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isEditMode ? 'Activité mise à jour' : 'Activité créée avec succès',
-        ),
-      ),
-    );
-
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
   Future<void> _handleDelete() async {
-    final confirm = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
+          (_) => AlertDialog(
             title: const Text('Supprimer cette activité ?'),
             content: const Text(
-              'Cette action est irréversible. Toutes les données associées seront perdues.',
+              'Cette action est irréversible et supprime toutes les données associées.',
             ),
             actions: [
               TextButton(
+                onPressed: () => Navigator.pop(context, false),
                 child: const Text('Annuler'),
-                onPressed: () => Navigator.of(ctx).pop(false),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(context, true),
                 child: const Text('Supprimer'),
-                onPressed: () => Navigator.of(ctx).pop(true),
               ),
             ],
           ),
     );
 
-    if (confirm == true && widget.partnerId != null) {
-      await FirebaseFirestore.instance
-          .collection('partners')
-          .doc(widget.partnerId)
-          .delete();
-
-      if (!mounted) return;
+    if (ok == true && mounted) {
+      await PartnerService.deactivatePartner(widget.partnerId!);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Activité supprimée')));
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      ).showSnackBar(const SnackBar(content: Text('Activité supprimée ❌')));
+      Navigator.pop(context);
     }
   }
 
@@ -165,31 +147,28 @@ class _ManagePartnerPageState extends State<ManagePartnerPage> {
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              : Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    ManagePartnerHeader(
+                    PartnerHeaderForm(
                       formKey: _formKey,
                       nameController: _nameCtrl,
                       descriptionController: _descCtrl,
-                      selectedCategory: _selectedCat,
-                      categories: _cats,
-                      onCategoryChanged:
-                          (c) => setState(() => _selectedCat = c ?? 'Cuisine'),
-                      onCreate: _handleSave,
+                      selectedCategory: _selectedCategory,
+                      categories: _categories,
+                      onCategoryChanged: (c) {
+                        if (c != null) setState(() => _selectedCategory = c);
+                      },
+                      onSubmit: _handleSave,
                       isEditing: _isEditMode,
+                      isLoading: _isLoading,
                     ),
                     if (_isEditMode) ...[
                       const SizedBox(height: 24),
-                      ElevatedButton.icon(
+                      DeleteButton(
+                        label: 'Supprimer l’activité',
                         onPressed: _handleDelete,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                        icon: const Icon(Icons.delete),
-                        label: const Text("Supprimer l'activité"),
                       ),
                     ],
                   ],
