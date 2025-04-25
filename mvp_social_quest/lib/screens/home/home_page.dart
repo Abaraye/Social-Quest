@@ -1,16 +1,10 @@
-import 'package:flutter/material.dart';
+// lib/screens/home/home_page.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import 'package:mvp_social_quest/screens/partners/merchant_dashboard_home.dart';
-import 'package:mvp_social_quest/screens/partners/partners_list_page.dart';
-import 'package:mvp_social_quest/screens/bookings/my_bookings_page.dart';
-import 'package:mvp_social_quest/screens/favorites/favorites_page.dart';
-import 'package:mvp_social_quest/screens/profile/profile_page.dart';
-
-/// 🏠 Page d’accueil avec navigation par BottomNavigationBar.
-///   - Si l’utilisateur est commerçant, affiche son dashboard et son profil.
-///   - Sinon, affiche Explorer, Réservations, Favoris et Profil.
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -19,93 +13,126 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
-  bool _isMerchant = false;
-  bool _loading = true;
+  String _search = '';
+  String _category = 'Tout';
+  bool _checkingMerchant = true;
 
   @override
   void initState() {
     super.initState();
-    _determineUserType();
+    // Après le premier frame, on vérifie le rôle + existence de partner
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleMerchantFlow());
   }
 
-  /// Récupère le type de l’utilisateur depuis /users/{uid}.type
-  Future<void> _determineUserType() async {
+  Future<void> _handleMerchantFlow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      // pas connecté → profil invité
-      setState(() => _loading = false);
+      setState(() => _checkingMerchant = false);
       return;
     }
-    final doc =
+
+    // 1️⃣ Récupère le type depuis Firestore /users/{uid}
+    final profileSnap =
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
-    final type = doc.data()?['type'] as String? ?? 'user';
-    setState(() {
-      _isMerchant = (type == 'merchant');
-      _loading = false;
-    });
+    final type = profileSnap.data()?['type'] as String?;
+
+    if (type == 'merchant') {
+      // 2️⃣ Si merchant, regarde ses partners
+      final partnersSnap =
+          await FirebaseFirestore.instance
+              .collection('partners')
+              .where('ownerId', isEqualTo: user.uid)
+              .where('active', isEqualTo: true)
+              .get();
+
+      if (partnersSnap.docs.isEmpty) {
+        // Pas encore de commerce → onboarding
+        context.go('/partner-form');
+      } else {
+        // Commerce existant → dashboard
+        final firstId = partnersSnap.docs.first.id;
+        context.go('/dashboard/$firstId');
+      }
+      return;
+    }
+
+    // 3️⃣ Pour les autres (ou non connecté), on affiche HomePage normalement
+    setState(() => _checkingMerchant = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      // Loader global
+    // Si on est en train de vérifier le rôle, monte un loader
+    if (_checkingMerchant) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final pages =
-        _isMerchant
-            ? [const MerchantDashboardHome(), const ProfilePage()]
-            : [
-              const PartnersListPage(),
-              const MyBookingsPage(),
-              const FavoritesPage(),
-              const ProfilePage(),
-            ];
+    // Sinon, on affiche la page Explorer habituelle
+    Query questsQuery = FirebaseFirestore.instance
+        .collection('quests')
+        .where('isActive', isEqualTo: true);
 
-    final items =
-        _isMerchant
-            ? const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart),
-                label: 'Dashboard',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profil',
-              ),
-            ]
-            : const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.explore),
-                label: 'Explorer',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.event),
-                label: 'Réservations',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.favorite),
-                label: 'Favoris',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profil',
-              ),
-            ];
+    if (_category != 'Tout') {
+      questsQuery = questsQuery.where('category', isEqualTo: _category);
+    }
+    if (_search.isNotEmpty) {
+      questsQuery = questsQuery.orderBy('title').startAt([_search]).endAt([
+        '$_search\uf8ff',
+      ]);
+    }
 
     return Scaffold(
-      body: pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        items: items,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) => setState(() => _currentIndex = index),
+      appBar: AppBar(
+        title: TextField(
+          decoration: const InputDecoration(
+            hintText: 'Rechercher…',
+            border: InputBorder.none,
+          ),
+          onChanged: (v) => setState(() => _search = v.trim()),
+        ),
+        actions: [
+          DropdownButton<String>(
+            value: _category,
+            underline: const SizedBox(),
+            items:
+                ['Tout', 'Sport', 'Cuisine', 'Bien-être', 'Aventure']
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+            onChanged: (c) => setState(() => _category = c!),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: questsQuery.snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('Aucune activité trouvée'));
+          }
+
+          final docs = snapshot.data!.docs;
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final title = data['title'] as String? ?? 'Sans titre';
+              final category = data['category'] as String? ?? '—';
+
+              return ListTile(
+                title: Text(title),
+                subtitle: Text(category),
+                onTap: () => context.go('/quest/${doc.id}'),
+              );
+            },
+          );
+        },
       ),
     );
   }

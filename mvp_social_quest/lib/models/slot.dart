@@ -16,10 +16,19 @@ class Slot {
   /// Indique si ce créneau est déjà réservé.
   final bool reserved;
 
+  /// Prix TTC du créneau, exprimé en centimes (ex. 1999 = 19,99 €).
+  final int priceCents;
+
+  /// Devise ISO-4217 (par défaut « EUR »).
+  final String currency;
+
+  /// Taux de TVA appliqué (ex. 0.20 pour 20 %), nullable tant qu’on n’expose pas la TVA.
+  final double? taxRate;
+
   /// Liste des réductions applicables.
   final List<Reduction> reductions;
 
-  /// Paramètres de récurrence (ex: type, endDate).
+  /// Paramètres de récurrence (ex : type, endDate).
   final Map<String, dynamic>? recurrence;
 
   /// Groupe de récurrence pour lier plusieurs templates.
@@ -36,6 +45,9 @@ class Slot {
     required this.startTime,
     required this.duration,
     this.reserved = false,
+    this.priceCents = 0,
+    this.currency = 'EUR',
+    this.taxRate,
     this.reductions = const [],
     this.recurrence,
     this.recurrenceGroupId,
@@ -50,6 +62,11 @@ class Slot {
       startTime: (map['startTime'] as Timestamp).toDate(),
       duration: map['duration'] as int? ?? 60,
       reserved: map['reserved'] as bool? ?? false,
+      priceCents:
+          map['priceCents'] as int? ??
+          0, // 🔄 fallback : 0 pour les anciens documents
+      currency: map['currency'] as String? ?? 'EUR',
+      taxRate: (map['taxRate'] as num?)?.toDouble(),
       reductions:
           (map['reductions'] as List<dynamic>?)
               ?.map((e) => Reduction.fromMap(Map<String, dynamic>.from(e)))
@@ -78,6 +95,9 @@ class Slot {
       'startTime': Timestamp.fromDate(startTime),
       'duration': duration,
       'reserved': reserved,
+      'priceCents': priceCents,
+      'currency': currency,
+      'taxRate': taxRate,
       'reductions': reductions.map((r) => r.toMap()).toList(),
       'recurrence': recurrence,
       'recurrenceGroupId': recurrenceGroupId,
@@ -95,6 +115,9 @@ class Slot {
     DateTime? startTime,
     int? duration,
     bool? reserved,
+    int? priceCents,
+    String? currency,
+    double? taxRate,
     List<Reduction>? reductions,
     Map<String, dynamic>? recurrence,
     String? recurrenceGroupId,
@@ -106,6 +129,9 @@ class Slot {
       startTime: startTime ?? this.startTime,
       duration: duration ?? this.duration,
       reserved: reserved ?? this.reserved,
+      priceCents: priceCents ?? this.priceCents,
+      currency: currency ?? this.currency,
+      taxRate: taxRate ?? this.taxRate,
       reductions: reductions ?? this.reductions,
       recurrence: recurrence ?? this.recurrence,
       recurrenceGroupId: recurrenceGroupId ?? this.recurrenceGroupId,
@@ -116,7 +142,8 @@ class Slot {
 
   @override
   String toString() {
-    return 'Slot(id: \$id, startTime: \$startTime, duration: \$duration, reserved: \$reserved)';
+    return 'Slot(id: $id, startTime: $startTime, duration: $duration, '
+        'reserved: $reserved, priceCents: $priceCents $currency)';
   }
 
   @override
@@ -126,9 +153,13 @@ class Slot {
         other.id == id &&
         other.startTime == startTime &&
         other.duration == duration &&
-        other.reserved == reserved;
+        other.reserved == reserved &&
+        other.priceCents == priceCents &&
+        other.currency == currency &&
+        other.taxRate == taxRate;
   }
 
   @override
-  int get hashCode => Object.hash(id, startTime, duration, reserved);
+  int get hashCode =>
+      Object.hash(id, startTime, duration, reserved, priceCents, currency);
 }

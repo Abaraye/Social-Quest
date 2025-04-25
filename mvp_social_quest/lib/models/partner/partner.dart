@@ -1,103 +1,157 @@
+// =============================================================
+// lib/models/partner.dart  – v2 (photos, ratings, geohash …)
+// =============================================================
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Représente un commerçant / partenaire.
+/// Modèle d’activité / partenaire
+///
+/// ⚠️  Tous les champs non obligatoires sont optionnels pour conserver la
+/// compatibilité ascendante. Les helpers fournissent des valeurs sûres.
 class Partner {
-  /// L’identifiant Firestore du document.
   final String id;
-
-  /// Nom de l’activité.
   final String name;
-
-  /// Description de l’activité.
   final String description;
-
-  /// Catégorie (ex: Cuisine, Sport…).
+  final String address;
   final String category;
+  final double latitude;
+  final double longitude;
 
-  /// Adresse complète (optionnelle).
-  final String? address;
+  // ➕ Nouveaux champs
+  final List<String> photos; // urls HTTPS (peut être vide)
+  final double? avgRating; // moyenne sur 5  (null si aucune review)
+  final int? reviewsCount; // nombre d’avis
+  final String? geohash; // pour GeoFlutterFire (optionnel)
+  final bool active; // soft delete / masquage
 
-  /// URL des photos (peut être vide).
-  final List<String> photos;
+  // Slots (sous‑collection → ici cache optionnel)
+  final Map<String, List<Map<String, dynamic>>> slots;
 
-  /// Note moyenne (0–5) ou null si pas encore noté.
-  final double? avgRating;
+  // champ legacy pour affichage reduction max (calculé si absent)
+  final int? maxReduction;
 
-  /// Pourcentage de réduction max proposé.
-  final int maxReductionDisplay;
-
-  /// Crée une instance à partir d’un snapshot Firestore.
-  factory Partner.fromSnapshot(DocumentSnapshot snap) {
-    final data = snap.data() as Map<String, dynamic>;
-    return Partner(
-      id: snap.id,
-      name: data['name'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      category: data['category'] as String? ?? '',
-      address: data['address'] as String?,
-      photos: List<String>.from(data['photos'] ?? []),
-      avgRating: (data['avgRating'] as num?)?.toDouble(),
-      maxReductionDisplay: (data['maxReductionDisplay'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  /// Crée une instance à partir d’une map Firestore et d’un ID.
-  factory Partner.fromMap(Map<String, dynamic> data, String id) {
-    return Partner(
-      id: id,
-      name: data['name'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      category: data['category'] as String? ?? '',
-      address: data['address'] as String?,
-      photos: List<String>.from(data['photos'] ?? []),
-      avgRating: (data['avgRating'] as num?)?.toDouble(),
-      maxReductionDisplay: (data['maxReductionDisplay'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  Partner({
+  const Partner({
     required this.id,
     required this.name,
     required this.description,
+    required this.address,
     required this.category,
-    this.address,
-    this.photos = const [],
+    required this.latitude,
+    required this.longitude,
+    required this.photos,
     this.avgRating,
-    this.maxReductionDisplay = 0,
+    this.reviewsCount,
+    this.geohash,
+    required this.active,
+    required this.slots,
+    this.maxReduction,
   });
 
-  /// Exporte en map Firestore.
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'description': description,
-      'category': category,
-      if (address != null) 'address': address,
-      'photos': photos,
-      if (avgRating != null) 'avgRating': avgRating,
-      'maxReductionDisplay': maxReductionDisplay,
-    };
-  }
+  // ---------------- JSON / Firestore helpers ----------------
 
-  /// Copie l’objet en modifiant certains champs.
-  Partner copyWith({
-    String? name,
-    String? description,
-    String? category,
-    String? address,
-    List<String>? photos,
-    double? avgRating,
-    int? maxReductionDisplay,
-  }) {
+  factory Partner.fromJson(Map<String, dynamic> json) => Partner(
+    id: json['id'],
+    name: json['name'],
+    description: json['description'],
+    address: json['address'] ?? '',
+    category: json['category'] ?? '',
+    latitude: (json['latitude'] ?? 0.0).toDouble(),
+    longitude: (json['longitude'] ?? 0.0).toDouble(),
+    photos: List<String>.from(json['photos'] ?? []),
+    avgRating: (json['avgRating'] as num?)?.toDouble(),
+    reviewsCount: json['reviewsCount'],
+    geohash: json['geohash'],
+    active: json['active'] ?? true,
+    slots: {},
+    maxReduction: json['maxReduction'],
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'address': address,
+    'category': category,
+    'latitude': latitude,
+    'longitude': longitude,
+    'photos': photos,
+    'avgRating': avgRating,
+    'reviewsCount': reviewsCount,
+    'geohash': geohash,
+    'active': active,
+    'maxReduction': maxReduction,
+  };
+
+  factory Partner.fromMap(Map<String, dynamic> data, String id) {
+    final rawSlots = data['slots'] ?? {};
+    final parsedSlots = <String, List<Map<String, dynamic>>>{};
+    for (final entry in rawSlots.entries) {
+      parsedSlots[entry.key] = List<Map<String, dynamic>>.from(
+        entry.value ?? [],
+      );
+    }
+
     return Partner(
       id: id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      category: category ?? this.category,
-      address: address ?? this.address,
-      photos: photos ?? this.photos,
-      avgRating: avgRating ?? this.avgRating,
-      maxReductionDisplay: maxReductionDisplay ?? this.maxReductionDisplay,
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      address: data['address'] ?? '',
+      category: data['category'] ?? '',
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
+      photos: List<String>.from(data['photos'] ?? []),
+      avgRating: (data['avgRating'] as num?)?.toDouble(),
+      reviewsCount: data['reviewsCount'],
+      geohash: data['geohash'],
+      active: data['active'] ?? true,
+      slots: parsedSlots,
+      maxReduction: data['maxReduction'],
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'description': description,
+    'address': address,
+    'category': category,
+    'latitude': latitude,
+    'longitude': longitude,
+    'photos': photos,
+    'avgRating': avgRating,
+    'reviewsCount': reviewsCount,
+    'geohash': geohash,
+    'active': active,
+    'slots': slots,
+    'maxReduction': maxReduction ?? computedMaxReduction,
+  };
+
+  // ---------------- Helpers business ----------------
+
+  int get computedMaxReduction {
+    int max = 0;
+    for (final redList in slots.values) {
+      for (final r in redList) {
+        final val = r['amount'];
+        if (val is int && val > max) max = val;
+      }
+    }
+    return max;
+  }
+
+  int get maxReductionDisplay => maxReduction ?? computedMaxReduction;
+
+  bool get hasUpcomingSlot {
+    final now = DateTime.now();
+    return slots.values.expand((e) => e).any((r) {
+      final ts = r['startTime'];
+      return ts is Timestamp && ts.toDate().isAfter(now);
+    });
+  }
+
+  bool get isValid => name.isNotEmpty && description.isNotEmpty;
+
+  @override
+  bool operator ==(Object other) => other is Partner && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

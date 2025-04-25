@@ -1,14 +1,15 @@
-// lib/screens/partners/merchant_dashboard_home.dart – v3.0
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/firestore/stats_service.dart';
 import 'merchant_dashboard_page.dart';
 import 'manage_partner_page.dart';
 
 class MerchantDashboardHome extends StatefulWidget {
-  const MerchantDashboardHome({super.key});
+  final String partnerId;
+  const MerchantDashboardHome({Key? key, required this.partnerId})
+    : super(key: key);
 
   @override
   State<MerchantDashboardHome> createState() => _MerchantDashboardHomeState();
@@ -16,6 +17,13 @@ class MerchantDashboardHome extends StatefulWidget {
 
 class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
   String? selectedPartnerId;
+
+  @override
+  void initState() {
+    super.initState();
+    // on démarre sur celui passé en paramètre
+    selectedPartnerId = widget.partnerId;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,28 +47,22 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
         if (partnerSnap.hasError) {
           return const Scaffold(body: Center(child: Text('Erreur Firestore.')));
         }
 
         final docs = partnerSnap.data?.docs ?? [];
         final hasActivities = docs.isNotEmpty;
-
-        final List<Map<String, String>> partners = [
+        final partners = [
           for (final d in docs)
             {'id': d.id, 'name': (d['name'] ?? '(Sans nom)').toString()},
         ];
 
-        final selected =
-            selectedPartnerId != null
-                ? partners.firstWhere(
-                  (p) => p['id'] == selectedPartnerId,
-                  orElse: () => partners.first,
-                )
-                : partners.isNotEmpty
-                ? partners.first
-                : null;
+        // si on a un sélectionné invalide, on retombe sur le premier
+        final selected = partners.firstWhere(
+          (p) => p['id'] == selectedPartnerId,
+          orElse: () => partners.first,
+        );
 
         return Scaffold(
           appBar: AppBar(
@@ -72,12 +74,8 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
                 onSelected: (value) {
                   switch (value) {
                     case 'new':
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ManagePartnerPage(),
-                        ),
-                      );
+                      // utilise GoRouter pour naviguer
+                      context.go('/dashboard/${selected['id']!}/quest/new');
                       break;
                     case 'switch':
                       _showPartnerSwitchDialog(partners);
@@ -85,12 +83,12 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
                   }
                 },
                 itemBuilder:
-                    (_) => [
-                      const PopupMenuItem(
+                    (_) => const [
+                      PopupMenuItem(
                         value: 'new',
                         child: Text("Créer une activité"),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'switch',
                         child: Text("Changer d'activité"),
                       ),
@@ -101,23 +99,19 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
           body:
               !hasActivities
                   ? const Center(
-                    child: Text(
-                      "Crée une activité pour voir les statistiques.",
-                    ),
+                    child: Text("Créez une activité pour voir les stats."),
                   )
                   : FutureBuilder<PartnerStats>(
-                    future: StatsService.getPartnerStats(selected!['id']!),
+                    future: StatsService.getPartnerStats(selected['id']!),
                     builder: (context, statSnap) {
                       if (statSnap.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-
                       if (statSnap.hasError) {
                         return const Center(
                           child: Text("Erreur lors du chargement des stats."),
                         );
                       }
-
                       final stats = statSnap.data!;
                       return MerchantDashboardPage(
                         partnerId: selected['id']!,
@@ -140,17 +134,17 @@ class _MerchantDashboardHomeState extends State<MerchantDashboardHome> {
     showDialog(
       context: context,
       builder:
-          (_) => AlertDialog(
+          (dialogContext) => AlertDialog(
             title: const Text('Changer d’activité'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children:
                   partners.map((p) {
                     return ListTile(
-                      title: Text(p['name'] ?? ''),
+                      title: Text(p['name']!),
                       onTap: () {
                         setState(() => selectedPartnerId = p['id']);
-                        Navigator.pop(context);
+                        Navigator.of(dialogContext).pop();
                       },
                     );
                   }).toList(),

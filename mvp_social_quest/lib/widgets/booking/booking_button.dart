@@ -34,7 +34,7 @@ class _BookingButtonState extends State<BookingButton> {
     });
 
     try {
-      await BookingService.createBooking(
+      await BookingService.instance.createSlotBooking(
         partnerId: widget.partnerId,
         slotId: widget.slotId,
         occurrence: widget.startTime,

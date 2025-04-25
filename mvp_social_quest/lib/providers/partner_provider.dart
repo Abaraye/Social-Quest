@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/partner/partner.dart';
-import '../services/firestore/partner_service.dart';
+import '../services/firestore/partner/partner_service.dart';
 
 /// ChangeNotifier to centralize the "current" Partner throughout the app.
 class PartnerProvider extends ChangeNotifier {

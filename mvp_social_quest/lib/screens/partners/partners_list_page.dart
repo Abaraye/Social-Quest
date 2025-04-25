@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/models/partner/partner.dart';
 import 'package:mvp_social_quest/screens/partners/partner_detail_page.dart';
-import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/services/firestore/partner/partner_service.dart';
 import 'package:mvp_social_quest/services/firestore/favorites_service.dart';
 import '../../widgets/partners/partner_card.dart';
 import '../../widgets/common/filter_bar.dart';

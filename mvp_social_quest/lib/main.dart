@@ -1,55 +1,49 @@
-// lib/main.dart – v2.2
-// 🔥 Initialisation Firebase + routing + thèmes + ProviderScope
-// ✔️ Redirige vers AuthGate → Dashboard ou autres selon utilisateur
-// ✔️ Fournit PartnerProvider en top‐level pour l’état du partenaire courant
-// -------------------------------------------------------------
+// lib/main.dart
 
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart';
+import 'core/router/app_router.dart'; // contient routerProvider
 import 'screens/auth/auth_gate.dart';
-import 'providers/partner_provider.dart';
 
+/// Initialise Firebase et la localisation
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('fr_FR', null);
-  // TODO: init Crashlytics / FCM ici si besoin
 }
 
 void main() {
   runZonedGuarded(
     () async {
       await _bootstrap();
-      runApp(
-        ChangeNotifierProvider(
-          create: (_) => PartnerProvider(),
-          child: const MyApp(),
-        ),
-      );
+      // ProviderScope pour Riverpod (providers définis dans app_router)
+      runApp(const ProviderScope(child: MyApp()));
     },
     (error, stack) {
-      // ignore: avoid_print
-      print('Uncaught zone error: $error');
-      // FirebaseCrashlytics.instance.recordError(error, stack);
+      // Gestion des erreurs non capturées
+      debugPrint('Uncaught zone error: \$error');
     },
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Point d'entrée de l'application
+/// Utilise ConsumerWidget pour accéder aux providers Riverpod
+class MyApp extends ConsumerWidget {
+  const MyApp({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Récupère le router configuré via routerProvider
+    final goRouter = ref.watch(routerProvider);
+
+    return MaterialApp.router(
       title: 'Social Quest',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
@@ -62,8 +56,10 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      onGenerateRoute: generateRoute,
-      home: const AuthGate(),
+
+      /// AuthGate vérifie l'état d'authentification avant d'afficher l'app
+      builder: (context, child) => AuthGate(child: child!),
+      routerConfig: goRouter,
     );
   }
 }

@@ -1,12 +1,11 @@
-// lib/screens/bookings/booking_detail_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/utils/price_calculator.dart'; // 🆕
 import '../../models/booking.dart';
 import '../../models/partner/partner.dart';
 import '../../services/firestore/booking_service.dart';
-import '../../services/firestore/partner_service.dart';
+import '../../services/firestore/partner/partner_service.dart';
 
 /// Affiche le détail d’une réservation (infos activité + date + réduction + annulation).
 class BookingDetailPage extends StatelessWidget {
@@ -16,11 +15,13 @@ class BookingDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // formattage localisé de la date
-    final formatted = DateFormat(
-      'EEEE dd MMMM yyyy • HH:mm',
-      'fr_FR',
-    ).format(booking.occurrence);
+    final dateFmt = DateFormat('EEEE dd MMMM yyyy • HH:mm', 'fr_FR');
+    final moneyFmt = NumberFormat.currency(locale: 'fr_FR', symbol: '€');
+
+    final netCents = PriceCalculator.netPriceCents(
+      booking.priceCents,
+      booking.reductionChosen.amount,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -39,7 +40,6 @@ class BookingDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ✨ Activité
                 const Text(
                   'Activité réservée',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -51,18 +51,61 @@ class BookingDetailPage extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 24),
-                // ✨ Date & heure
                 const Text(
                   'Date & heure',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(formatted),
+                Text(dateFmt.format(booking.occurrence)),
 
                 const SizedBox(height: 24),
-                // ✨ Réduction
                 const Text(
-                  'Réduction appliquée',
+                  'Tarification',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('Prix initial : '),
+                        Text(
+                          moneyFmt.format(booking.priceCents / 100),
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Text('Réduction : '),
+                        Text('-${booking.reductionChosen.amount}%'),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Text(
+                          'Total : ',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          moneyFmt.format(netCents / 100),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+                const Text(
+                  'Détail réduction',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -70,7 +113,6 @@ class BookingDetailPage extends StatelessWidget {
                   '-${booking.reductionChosen.amount}% dès ${booking.reductionChosen.groupSize} pers',
                 ),
 
-                // ✨ Adresse si dispo
                 if (partner?.address != null) ...[
                   const SizedBox(height: 24),
                   const Text(
@@ -83,7 +125,6 @@ class BookingDetailPage extends StatelessWidget {
 
                 const Spacer(),
 
-                // ✨ Bouton annuler si date future
                 if (booking.occurrence.isAfter(DateTime.now()))
                   ElevatedButton.icon(
                     icon: const Icon(Icons.cancel),
@@ -115,7 +156,7 @@ class BookingDetailPage extends StatelessWidget {
                             ),
                       );
                       if (ok == true) {
-                        await BookingService.deleteBooking(booking.id);
+                        await BookingService.instance.deleteBooking(booking.id);
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(

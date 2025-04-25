@@ -11,6 +11,7 @@ class SlotService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final Uuid _uuid = Uuid();
 
+  // ───────────────────────────────────────────────────────── Stream raw/expanded
   /// 📥 Flux temps réel des slots bruts (templates + one-off).
   static Stream<List<Slot>> streamRawSlots(String partnerId) {
     return _firestore
@@ -27,7 +28,7 @@ class SlotService {
         );
   }
 
-  /// 🔄 Flux temps réel des occurrences étendues (applique récurrence + exceptions).
+  /// 🔄 Flux temps réel des occurrences étendues (réccurence + exceptions).
   static Stream<List<Slot>> streamExpandedSlots(String partnerId) {
     return streamRawSlots(partnerId).map((rawSlots) {
       final now = DateTime.now();
@@ -41,23 +42,21 @@ class SlotService {
   }
 
   /// 📖 Lecture unique de la liste étendue des créneaux.
-  static Future<List<Slot>> getExpandedSlots(String partnerId) async {
-    return await streamExpandedSlots(partnerId).first;
-  }
+  static Future<List<Slot>> getExpandedSlots(String partnerId) async =>
+      streamExpandedSlots(partnerId).first;
 
-  /// 🏷 Alias (déprécié) pour compatibilité ascendante.
-  @Deprecated('Use getExpandedSlots() instead')
-  static Future<List<Slot>> getExpandedPartnerSlots(String partnerId) {
-    return getExpandedSlots(partnerId);
-  }
+  /// 🛑 Alias historique (conservé pour ne pas casser les appels existants).
+  @Deprecated('Renommé en getExpandedSlots() – À migrer puis supprimer.')
+  static Future<List<Slot>> getExpandedPartnerSlots(String partnerId) =>
+      getExpandedSlots(partnerId);
 
+  // ─────────────────────────────────────────────────────────── CRUD principal
   /// ➕ Ajoute un template de créneau (récurrent ou non).
   static Future<void> addSlot(String partnerId, Slot slot) async {
     final col = _firestore
         .collection('partners')
         .doc(partnerId)
         .collection('slots');
-
     final data =
         slot.toMap()
           ..remove('id')
@@ -65,7 +64,27 @@ class SlotService {
             'createdAt': FieldValue.serverTimestamp(),
             if (slot.recurrence != null) 'recurrenceGroupId': _uuid.v4(),
           });
+    await col.add(data);
+  }
 
+  /// ➕ Ajoute un slot one-off (instance), avec option `reserved`.
+  static Future<void> addInstanceSlot(
+    String partnerId,
+    Slot slot, {
+    bool reserved = false,
+  }) async {
+    final col = _firestore
+        .collection('partners')
+        .doc(partnerId)
+        .collection('slots');
+    final data = {
+      ...slot.toMap()..remove('id'),
+      'reserved': reserved,
+      'recurrence': null,
+      'recurrenceGroupId': null,
+      'exceptions': <Timestamp>[],
+      'createdAt': FieldValue.serverTimestamp(),
+    };
     await col.add(data);
   }
 
@@ -91,28 +110,6 @@ class SlotService {
         .collection('slots')
         .doc(slotId)
         .update({'reserved': true});
-  }
-
-  /// ➕ Ajoute un slot one-off (instance), avec option `reserved`.
-  static Future<void> addInstanceSlot(
-    String partnerId,
-    Slot slot, {
-    bool reserved = false,
-  }) async {
-    final col = _firestore
-        .collection('partners')
-        .doc(partnerId)
-        .collection('slots');
-
-    final data = {
-      ...slot.toMap()..remove('id'),
-      'reserved': reserved,
-      'recurrence': null,
-      'recurrenceGroupId': null,
-      'exceptions': <Timestamp>[],
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-    await col.add(data);
   }
 
   /// ✏️ Met à jour un template ou une instance de slot.
@@ -145,7 +142,7 @@ class SlotService {
         });
   }
 
-  /// 🗑️ Supprime toute une récurrence via recurrenceGroupId
+  /// 🗑️ Supprime toute une récurrence via `recurrenceGroupId`.
   static Future<void> deleteRecurrenceGroup(
     String partnerId,
     String recurrenceGroupId,

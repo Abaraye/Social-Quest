@@ -1,11 +1,10 @@
-// lib/screens/partners/partner_detail_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/utils/price_calculator.dart'; // 🆕
 import '../../models/slot.dart';
 import '../../models/partner/partner.dart';
-import '../../models/reduction.dart'; // ← import ajouté
+import '../../models/reduction.dart';
 import '../../services/firestore/slot_service.dart';
 import '../../services/firestore/booking_service.dart';
 import '../../widgets/common/rounded_button.dart';
@@ -26,6 +25,8 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
   Slot? _selectedSlot;
   Reduction? _selectedReduction;
 
+  final _priceFmt = NumberFormat.currency(locale: 'fr_FR', symbol: '€');
+
   @override
   void initState() {
     super.initState();
@@ -33,10 +34,55 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
     _slotsFuture = SlotService.getExpandedSlots(widget.partner.id);
   }
 
+  // --- UI helpers -----------------------------------------------------------
+
+  Widget _buildPriceInfo() {
+    if (_selectedSlot == null) return const SizedBox.shrink();
+
+    final base = _selectedSlot!.priceCents / 100.0;
+    final hasReduction = _selectedReduction != null;
+    final netCents =
+        hasReduction
+            ? PriceCalculator.netPriceCents(
+              _selectedSlot!.priceCents,
+              _selectedReduction!.amount,
+            )
+            : _selectedSlot!.priceCents;
+    final net = netCents / 100.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('💶 Prix', style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            if (hasReduction)
+              Text(
+                _priceFmt.format(base),
+                style: const TextStyle(
+                  decoration: TextDecoration.lineThrough,
+                  color: Colors.grey,
+                ),
+              ),
+            if (hasReduction) const SizedBox(width: 8),
+            Text(
+              _priceFmt.format(net),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------------------
+
   Future<void> _confirmReservation() async {
     final slot = _selectedSlot!;
     final red = _selectedReduction!;
-    await BookingService.createBooking(
+    await BookingService.instance.createSlotBooking(
       partnerId: widget.partner.id,
       slotId: slot.id,
       occurrence: slot.startTime,
@@ -77,6 +123,8 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
     );
   }
 
+  // -------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -108,7 +156,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                 ),
                 const SizedBox(height: 8),
 
-                // Liste horizontale de ChoiceChips pour les dates
+                // --- Liste horizontale de ChoiceChips pour les dates
                 SizedBox(
                   height: 40,
                   child: ListView.separated(
@@ -133,7 +181,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                   ),
                 ),
 
-                // Sélection de la réduction
+                // --- Sélection de la réduction
                 if (_selectedSlot?.reductions.isNotEmpty ?? false) ...[
                   const SizedBox(height: 16),
                   const Align(
@@ -162,9 +210,12 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                   ),
                 ],
 
+                // --- Affichage du prix ------------------------------------
+                _buildPriceInfo(),
+
                 const Spacer(),
 
-                // Bouton Réserver
+                // --- Bouton Réserver
                 RoundedButton(
                   onPressed:
                       (_selectedSlot != null && _selectedReduction != null)

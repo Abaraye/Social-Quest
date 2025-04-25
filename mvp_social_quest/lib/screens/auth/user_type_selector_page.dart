@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
-import 'signup_page.dart';
+import 'package:go_router/go_router.dart';
 
-/// 🤔 Choix du type de compte (utilisateur vs commerçant).
 class UserTypeSelectorPage extends StatelessWidget {
   const UserTypeSelectorPage({Key? key}) : super(key: key);
 
-  void _navigateTo(BuildContext ctx, String type) {
-    Navigator.push(
-      ctx,
-      MaterialPageRoute(builder: (_) => SignUpPage(userType: type)),
-    );
+  void _go(BuildContext ctx, String type) {
+    ctx.push('/signup/$type');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Création de compte")),
+      appBar: AppBar(
+        title: const Text("Création de compte"),
+        leading: BackButton(onPressed: () => context.pop()),
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -34,31 +33,34 @@ class UserTypeSelectorPage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              _buildButton(context, 'Utilisateur', Icons.person, 'user'),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person),
+                label: const Text('Utilisateur'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                onPressed: () => _go(context, 'user'),
+              ),
               const SizedBox(height: 12),
-              _buildButton(context, 'Commerçant', Icons.store, 'merchant'),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.store),
+                label: const Text('Commerçant'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                onPressed: () => _go(context, 'merchant'),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildButton(
-    BuildContext context,
-    String label,
-    IconData icon,
-    String userType,
-  ) {
-    return ElevatedButton.icon(
-      onPressed: () => _navigateTo(context, userType),
-      icon: Icon(icon),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
     );
   }

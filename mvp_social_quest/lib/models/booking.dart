@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mvp_social_quest/models/reduction.dart';
 
-/// Représente une réservation d’un créneau.
+/// 📅 Représente une réservation d’un créneau.
 class Booking {
   /// Identifiant Firestore du document.
   final String id;
@@ -18,12 +18,24 @@ class Booking {
   /// Réduction choisie pour cette réservation.
   final Reduction reductionChosen;
 
+  /// Prix TTC du slot (snapshot au moment de la réservation), en centimes.
+  final int priceCents;
+
+  /// Devise ISO-4217. Permet de conserver l’historique même si on change plus tard.
+  final String currency;
+
+  /// Taux de TVA appliqué à la réservation (nullable).
+  final double? taxRate;
+
   Booking({
     required this.id,
     required this.partnerId,
     required this.slotId,
     required this.occurrence,
     required this.reductionChosen,
+    this.priceCents = 0,
+    this.currency = 'EUR',
+    this.taxRate,
   });
 
   /// Crée à partir d’un snapshot Firestore.
@@ -41,6 +53,9 @@ class Booking {
       slotId: data['slotId'] as String,
       occurrence: (data['startTime'] as Timestamp).toDate(),
       reductionChosen: Reduction.fromMap(redMap),
+      priceCents: data['priceCents'] as int? ?? 0,
+      currency: data['currency'] as String? ?? 'EUR',
+      taxRate: (data['taxRate'] as num?)?.toDouble(),
     );
   }
 
@@ -51,6 +66,14 @@ class Booking {
       'slotId': slotId,
       'reductionChosen': reductionChosen.toMap(),
       'startTime': Timestamp.fromDate(occurrence),
+      'priceCents': priceCents,
+      'currency': currency,
+      'taxRate': taxRate,
     };
   }
+
+  @override
+  String toString() =>
+      'Booking(id: $id, partner: $partnerId, slot: $slotId, '
+      'start: $occurrence, price: $priceCents $currency)';
 }

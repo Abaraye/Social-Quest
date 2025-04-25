@@ -1,45 +1,81 @@
-# Miscellaneous
-*.class
+###############################################################################
+#                       G É N É R A L – CROSS-PLATFORM                        #
+###############################################################################
+
+# Logs, caches, binaires temporaires
 *.log
-*.pyc
 *.swp
 .DS_Store
-.atom/
-.build/
-.buildlog/
 .history
-.svn/
-.swiftpm/
+*.class
+*.pyc
 migrate_working_dir/
 
-# IntelliJ related
+###############################################################################
+#                               IDE / ÉDITEURS                                #
+###############################################################################
+
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code – on garde .vscode si tu veux versionner tes tâches / launch.json
+# .vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+###############################################################################
+#                         FLUTTER / DART SPÉCIFIQUE                           #
+###############################################################################
+
+# Outils & caches
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
 
-# Symbolication related
+# Builds (toutes plateformes)
+**/build/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Symbolication & obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio builds
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+###############################################################################
+#                          NODE / TYPESCRIPT (Functions)                      #
+###############################################################################
+
+# Dépendances – **NE JAMAIS** versionner
+node_modules/
+**/node_modules/
+
+# Sorties de compilation TS (si tu compiles dans ./lib ou ./dist)
+dist/
+functions/cli/lib/
+functions/lib/
+
+# Dotenv & secrets
+.env
+.env.*
+service-account.json      # 👈 clé de service Firebase Admin
+
+# Firebase CLI artefacts
+.firebase/
+
+###############################################################################
+#                             DIVERS À IGNORER                                #
+###############################################################################
+
+.atom/
+.build/
+.buildlog/
+.svn/
+.swiftpm/

@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:mvp_social_quest/screens/home/home_page.dart';
-import 'package:mvp_social_quest/services/auth/auth_service.dart';
-import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/services/firestore/auth/auth_service.dart';
+import 'package:mvp_social_quest/services/firestore/partner/partner_service.dart';
 import '../../widgets/common/rounded_button.dart';
 
 /// 🏁 Inscription + création de la première activité commerçant.

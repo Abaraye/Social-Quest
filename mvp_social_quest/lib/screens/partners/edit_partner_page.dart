@@ -1,7 +1,7 @@
 // lib/screens/partners/edit_partner_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/services/firestore/partner/partner_service.dart';
 import 'package:mvp_social_quest/widgets/partners/manage/header.dart';
 import '../../models/partner/partner.dart';
 

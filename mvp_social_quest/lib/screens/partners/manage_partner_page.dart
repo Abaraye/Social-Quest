@@ -7,7 +7,7 @@
 // -------------------------------------------------------------
 
 import 'package:flutter/material.dart';
-import 'package:mvp_social_quest/services/firestore/partner_service.dart';
+import 'package:mvp_social_quest/services/firestore/partner/partner_service.dart';
 import 'package:mvp_social_quest/widgets/common/delete_button.dart';
 import 'package:mvp_social_quest/widgets/partners/manage/header.dart';
 

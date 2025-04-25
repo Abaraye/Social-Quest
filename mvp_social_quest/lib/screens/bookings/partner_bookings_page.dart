@@ -18,7 +18,7 @@ class PartnerBookingsPage extends StatelessWidget {
         backgroundColor: Colors.deepPurple,
       ),
       body: StreamBuilder<List<Booking>>(
-        stream: BookingService.streamForPartner(partnerId),
+        stream: BookingService.instance.streamForPartner(partnerId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -69,7 +69,7 @@ class PartnerBookingsPage extends StatelessWidget {
                           ),
                     );
                     if (confirmed == true) {
-                      await BookingService.deleteBooking(b.id);
+                      await BookingService.instance.deleteBooking(b.id);
                     }
                   },
                 ),

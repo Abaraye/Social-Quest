@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart';
-import 'user_type_selector_page.dart';
-import '../home/home_page.dart';
+import 'package:go_router/go_router.dart';
 
-/// ✨ Écran d’accueil animé (fade + slide).
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
 
@@ -38,10 +35,6 @@ class _WelcomePageState extends State<WelcomePage>
     super.dispose();
   }
 
-  void _go(BuildContext ctx, Widget page) {
-    Navigator.push(ctx, MaterialPageRoute(builder: (_) => page));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,6 +59,7 @@ class _WelcomePageState extends State<WelcomePage>
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 40),
+
                 ElevatedButton.icon(
                   icon: const Icon(Icons.person_add),
                   label: const Text("Créer un compte"),
@@ -76,7 +70,7 @@ class _WelcomePageState extends State<WelcomePage>
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () => _go(context, const UserTypeSelectorPage()),
+                  onPressed: () => context.push('/signup'),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -88,16 +82,12 @@ class _WelcomePageState extends State<WelcomePage>
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () => _go(context, const LoginPage()),
+                  onPressed: () => context.push('/login'),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
                   child: const Text("Continuer sans compte"),
-                  onPressed:
-                      () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HomePage()),
-                      ),
+                  onPressed: () => context.go('/'),
                 ),
               ],
             ),

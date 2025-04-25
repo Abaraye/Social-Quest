@@ -1,9 +1,9 @@
-// lib/widgets/partners/slots/slots_calendar.dart
-
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:table_calendar/table_calendar.dart';
 
+import '../../../core/utils/validators.dart'; // 🆕
+import '../../../models/reduction.dart';
 import '../../../models/slot.dart';
 import '../../../services/firestore/slot_service.dart';
 
@@ -36,6 +36,8 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
   Map<DateTime, List<Slot>> _slotsByDay = {};
   bool _showOnlyFree = false;
 
+  static const int _defaultPriceCents = 2000; // 20 €
+
   @override
   void initState() {
     super.initState();
@@ -43,10 +45,8 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
   }
 
   Future<void> _loadAndGroupSlots() async {
-    // récupère tous les templates + instances et génère leurs occurrences
     final raw = await SlotService.getExpandedSlots(widget.partnerId);
     final map = <DateTime, List<Slot>>{};
-
     for (final slot in raw) {
       final key = DateTime(
         slot.startTime.year,
@@ -55,11 +55,9 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
       );
       map.putIfAbsent(key, () => []).add(slot);
     }
-
-    map.forEach((_, list) {
-      list.sort((a, b) => a.startTime.compareTo(b.startTime));
-    });
-
+    map.forEach(
+      (_, list) => list.sort((a, b) => a.startTime.compareTo(b.startTime)),
+    );
     setState(() => _slotsByDay = map);
   }
 
@@ -72,6 +70,91 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
     return all;
   }
 
+  // ───────────────────────────── Ajout rapide d’un créneau simple
+  Future<void> _addQuickSlot() async {
+    if (_selectedDay == null) return;
+
+    // 1. Demande l’heure
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 18, minute: 0),
+    );
+    if (time == null) return;
+
+    // 2. Demande le prix TTC (€) – validated by FormValidators.priceRange
+    final priceEuros = await _askPriceDialog();
+    if (priceEuros == null) return;
+    final priceCents = (priceEuros * 100).round();
+
+    final start = DateTime(
+      _selectedDay!.year,
+      _selectedDay!.month,
+      _selectedDay!.day,
+      time.hour,
+      time.minute,
+    );
+
+    final slot = Slot(
+      id: '',
+      startTime: start,
+      duration: 60,
+      priceCents: priceCents,
+      currency: 'EUR',
+      reductions: const <Reduction>[],
+      reserved: false,
+    );
+
+    await SlotService.addSlot(widget.partnerId, slot);
+    await _loadAndGroupSlots();
+    widget.onSlotAdded?.call();
+  }
+
+  Future<double?> _askPriceDialog() async {
+    final ctrl = TextEditingController(
+      text: (_defaultPriceCents / 100).toStringAsFixed(2),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final res = await showDialog<double>(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Prix TTC (€)'),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(suffixText: '€'),
+                validator: FormValidators.priceRange(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(
+                      context,
+                      double.parse(ctrl.text.replaceAll(',', '.')),
+                    );
+                  }
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+    return res;
+  }
+
+  // ──────────────────────────────────────────────────────────── UI
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -83,11 +166,10 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
           focusedDay: _focusedDay,
           selectedDayPredicate:
               (d) => _selectedDay != null && isSameDay(d, _selectedDay),
-          onDaySelected: (selected, focused) {
+          onDaySelected: (sel, foc) {
             setState(() {
-              _selectedDay =
-                  isSameDay(selected, _selectedDay) ? null : selected;
-              _focusedDay = focused;
+              _selectedDay = isSameDay(sel, _selectedDay) ? null : sel;
+              _focusedDay = foc;
             });
           },
           eventLoader: _eventsForDay,
@@ -101,6 +183,11 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
             title: const Text('Afficher seulement disponibles'),
             value: _showOnlyFree,
             onChanged: (v) => setState(() => _showOnlyFree = v),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Ajouter créneau rapide'),
+            onPressed: _addQuickSlot,
           ),
         ],
 
@@ -116,7 +203,10 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
                   color: slot.reserved ? Colors.grey.shade200 : Colors.white,
                   child: ListTile(
                     title: Text(time),
-                    subtitle: Text('${slot.reductions.length} réduction(s)'),
+                    subtitle: Text(
+                      '${slot.priceCents / 100} € • '
+                      '${slot.reductions.length} réduction(s)',
+                    ),
                     trailing:
                         widget.mode == SlotsCalendarMode.manage
                             ? IconButton(
@@ -174,7 +264,6 @@ class _SlotsCalendarState extends State<SlotsCalendar> {
         );
       }
     } else {
-      // pour un créneau one-off, on peut le marquer réservé ou le supprimer
       await SlotService.updateSlot(
         partnerId: widget.partnerId,
         slotId: slot.id,

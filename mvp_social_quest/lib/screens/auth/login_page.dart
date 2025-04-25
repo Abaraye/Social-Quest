@@ -1,10 +1,17 @@
+// lib/screens/auth/login_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:mvp_social_quest/services/auth/auth_service.dart';
-import 'package:mvp_social_quest/screens/home/home_page.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mvp_social_quest/services/firestore/auth/auth_service.dart';
 import 'package:mvp_social_quest/widgets/auth/auth_form_field.dart';
 import 'package:mvp_social_quest/core/utils/form_validators.dart';
 
-/// 🔐 Page de connexion par email/mot de passe.
+/// Page de connexion
+/// ------------------
+/// • Authentifie l’utilisateur via AuthService
+/// • En cas de succès, on navigue vers `/` (HomePage),
+///   laissant GoRouter (redirect) acheminer vers le dashboard
+///   ou le formulaire de création si besoin.
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
 
@@ -25,7 +32,6 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  /// 📲 Tente de se connecter via AuthService
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -36,19 +42,15 @@ class _LoginPageState extends State<LoginPage> {
         _passCtrl.text.trim(),
       );
       if (user != null && mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (_) => false,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connecté en tant que ${user.email}')),
-        );
+        // On redirige vers HomePage ('/') pour déclencher redirect
+        context.go('/');
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur de connexion : $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Erreur : $e")));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -56,9 +58,11 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 🧱 UI structurée, facilement décomposable
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
+      appBar: AppBar(
+        title: const Text('Connexion'),
+        leading: BackButton(onPressed: () => context.pop()),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -68,12 +72,10 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 const Spacer(),
                 const Text(
-                  'Bienvenue de retour 👋',
+                  'Bienvenue 👋',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 32),
-
-                // Email
                 AuthFormField(
                   controller: _emailCtrl,
                   label: 'Email',
@@ -82,8 +84,6 @@ class _LoginPageState extends State<LoginPage> {
                   validator: FormValidators.email,
                 ),
                 const SizedBox(height: 16),
-
-                // Mot de passe
                 AuthFormField(
                   controller: _passCtrl,
                   label: 'Mot de passe',
@@ -92,8 +92,6 @@ class _LoginPageState extends State<LoginPage> {
                   validator: FormValidators.password,
                 ),
                 const SizedBox(height: 24),
-
-                // Bouton
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

@@ -1,11 +1,16 @@
+// lib/screens/auth/signup_page.dart
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mvp_social_quest/services/auth/auth_service.dart';
-import 'package:mvp_social_quest/screens/home/home_page.dart';
+import 'package:mvp_social_quest/services/firestore/auth/auth_service.dart';
 import 'package:mvp_social_quest/widgets/auth/auth_form_field.dart';
 import 'package:mvp_social_quest/core/utils/form_validators.dart';
 
-/// 🔐 Page d’inscription (type “user” ou “merchant”).
+/// Page d'inscription
+/// ------------------
+/// • Crée l'utilisateur et le profil Firestore (`type`, `favorites`...)
+/// • En cas de succès, redirige vers `/` (HomePage) pour déclencher la logique de redirect
 class SignUpPage extends StatefulWidget {
   final String userType;
   const SignUpPage({Key? key, required this.userType}) : super(key: key);
@@ -29,7 +34,6 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  /// 📋 Crée un compte Firebase + enregistre le profil en Firestore.
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -39,44 +43,44 @@ class _SignUpPageState extends State<SignUpPage> {
         _emailCtrl.text.trim(),
         _passCtrl.text.trim(),
       );
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'email': _emailCtrl.text.trim(),
-          'name': _nameCtrl.text.trim(),
-          'type': widget.userType,
-          'favorites': [],
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      if (user == null) throw Exception('Inscription refusée');
 
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
-            (_) => false,
-          );
-        }
-      }
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': _emailCtrl.text.trim(),
+        'name': _nameCtrl.text.trim(),
+        'type': widget.userType,
+        'favorites': <String>[],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      // Redirige vers HomePage ('/') pour déclencher la logique de redirect
+      context.go('/');
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur d\'inscription : $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Créer un compte")),
+      appBar: AppBar(
+        title: const Text('Créer un compte'),
+        leading: BackButton(onPressed: () => context.pop()),
+      ),
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.only(
             left: 24,
             right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
             top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
           ),
           child: SingleChildScrollView(
             child: Form(
@@ -88,8 +92,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 32),
-
-                  // Nom / pseudo
                   AuthFormField(
                     controller: _nameCtrl,
                     label: 'Nom ou pseudo',
@@ -97,8 +99,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     validator: FormValidators.requiredField,
                   ),
                   const SizedBox(height: 16),
-
-                  // Email
                   AuthFormField(
                     controller: _emailCtrl,
                     label: 'Adresse email',
@@ -107,18 +107,14 @@ class _SignUpPageState extends State<SignUpPage> {
                     validator: FormValidators.email,
                   ),
                   const SizedBox(height: 16),
-
-                  // Mot de passe
                   AuthFormField(
                     controller: _passCtrl,
-                    label: 'Mot de passe (min. 6 caractères)',
+                    label: 'Mot de passe (min. 6 car.)',
                     icon: Icons.lock,
                     obscureText: true,
                     validator: FormValidators.password,
                   ),
                   const SizedBox(height: 24),
-
-                  // Bouton
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
