@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mvp_social_quest/services/firestore/auth/auth_service.dart';
-import 'package:mvp_social_quest/widgets/auth/auth_form_field.dart';
+import 'package:mvp_social_quest/services/auth_service.dart';
+import 'package:mvp_social_quest/widgets/forms/auth_form_field.dart';
 import 'package:mvp_social_quest/core/utils/form_validators.dart';
 
 /// Page d'inscription
@@ -39,14 +39,16 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
 
     try {
-      final user = await AuthService.signUp(
+      final cred = await AuthService.signUp(
         _emailCtrl.text.trim(),
         _passCtrl.text.trim(),
       );
-      if (user == null) throw Exception('Inscription refusée');
 
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'uid': user.uid,
+      final uid = cred.user?.uid;
+      if (uid == null) throw Exception('Inscription refusée');
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'uid': uid,
         'email': _emailCtrl.text.trim(),
         'name': _nameCtrl.text.trim(),
         'type': widget.userType,

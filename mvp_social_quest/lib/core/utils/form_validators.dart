@@ -1,28 +1,13 @@
 class FormValidators {
-  static String? requiredField(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Champ requis';
-    }
-    return null;
-  }
+  static String? requiredField(String? value) =>
+      (value == null || value.trim().isEmpty) ? 'Champ requis' : null;
 
   static String? email(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Adresse email requise';
-    }
-    if (!value.contains('@')) {
-      return 'Adresse email invalide';
-    }
-    return null;
+    if (requiredField(value) != null) return 'Email requis';
+    final regex = RegExp(r'^[\w\-.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return regex.hasMatch(value!.trim()) ? null : 'Email invalide';
   }
 
-  static String? password(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Mot de passe requis';
-    }
-    if (value.length < 6) {
-      return '6 caractères minimum';
-    }
-    return null;
-  }
+  static String? password(String? value) =>
+      (value != null && value.length >= 6) ? null : '6 caractères minimum';
 }

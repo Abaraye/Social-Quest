@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mvp_social_quest/services/firestore/auth/auth_service.dart';
-import 'package:mvp_social_quest/widgets/auth/auth_form_field.dart';
+import 'package:mvp_social_quest/services/auth_service.dart';
+import 'package:mvp_social_quest/widgets/forms/auth_form_field.dart';
 import 'package:mvp_social_quest/core/utils/form_validators.dart';
 
 /// Page de connexion
@@ -41,7 +41,7 @@ class _LoginPageState extends State<LoginPage> {
         _emailCtrl.text.trim(),
         _passCtrl.text.trim(),
       );
-      if (user != null && mounted) {
+      if (user != mounted) {
         // On redirige vers HomePage ('/') pour déclencher redirect
         context.go('/');
       }

@@ -1,80 +1,82 @@
+// lib/models/slot.dart
+// -----------------------------------------------------------------------------
+// Modèle de créneau horaire (Slot), lié à une Quest.
+// Mise à jour : Suppression de la liste de réductions directe.
+// Les réductions sont désormais une sous-collection Firestore.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'reduction.dart';
-
-/// 🎫 Modèle de créneau horaire (template ou instance).
 class Slot {
   /// Identifiant Firestore du document.
   final String id;
 
-  /// Date et heure de début.
+  /// Identifiant de la Quest associée.
+  final String questId;
+
+  /// Date et heure de début du créneau.
   final DateTime startTime;
 
-  /// Durée en minutes.
+  /// Durée du créneau en minutes.
   final int duration;
 
-  /// Indique si ce créneau est déjà réservé.
+  /// Statut de réservation (false par défaut).
   final bool reserved;
 
-  /// Prix TTC du créneau, exprimé en centimes (ex. 1999 = 19,99 €).
+  /// Prix TTC en centimes d'euro.
   final int priceCents;
 
-  /// Devise ISO-4217 (par défaut « EUR »).
+  /// Devise ISO-4217 ("EUR" par défaut).
   final String currency;
 
-  /// Taux de TVA appliqué (ex. 0.20 pour 20 %), nullable tant qu’on n’expose pas la TVA.
+  /// Taux de TVA applicable (optionnel).
   final double? taxRate;
 
-  /// Liste des réductions applicables.
-  final List<Reduction> reductions;
+  /// Nombre de réductions associées (champ pratique pour UI).
+  final int discountCount;
 
-  /// Paramètres de récurrence (ex : type, endDate).
+  /// Paramètres de récurrence (facultatif).
   final Map<String, dynamic>? recurrence;
 
-  /// Groupe de récurrence pour lier plusieurs templates.
+  /// Identifiant de groupe de récurrence.
   final String? recurrenceGroupId;
 
-  /// Exceptions (dates exclues) pour un template récurrent.
+  /// Dates d'exceptions (exclusions de récurrence).
   final List<DateTime> exceptions;
 
-  /// Timestamp de création (serveur).
+  /// Timestamp de création.
   final DateTime? createdAt;
 
   const Slot({
     required this.id,
+    required this.questId,
     required this.startTime,
     required this.duration,
     this.reserved = false,
     this.priceCents = 0,
     this.currency = 'EUR',
     this.taxRate,
-    this.reductions = const [],
+    this.discountCount = 0,
     this.recurrence,
     this.recurrenceGroupId,
     this.exceptions = const [],
     this.createdAt,
   });
 
-  /// Crée une instance depuis une map Firestore.
+  /// Crée une instance Slot depuis une map Firestore.
   factory Slot.fromMap(Map<String, dynamic> map) {
     return Slot(
       id: map['id'] as String,
+      questId: map['questId'] as String,
       startTime: (map['startTime'] as Timestamp).toDate(),
       duration: map['duration'] as int? ?? 60,
       reserved: map['reserved'] as bool? ?? false,
-      priceCents:
-          map['priceCents'] as int? ??
-          0, // 🔄 fallback : 0 pour les anciens documents
+      priceCents: map['priceCents'] as int? ?? 0,
       currency: map['currency'] as String? ?? 'EUR',
       taxRate: (map['taxRate'] as num?)?.toDouble(),
-      reductions:
-          (map['reductions'] as List<dynamic>?)
-              ?.map((e) => Reduction.fromMap(Map<String, dynamic>.from(e)))
-              .toList() ??
-          [],
+      discountCount: map['discountCount'] as int? ?? 0,
       recurrence:
           map['recurrence'] != null
-              ? Map<String, dynamic>.from(map['recurrence'] as Map)
+              ? Map<String, dynamic>.from(map['recurrence'])
               : null,
       recurrenceGroupId: map['recurrenceGroupId'] as String?,
       exceptions:
@@ -89,16 +91,17 @@ class Slot {
     );
   }
 
-  /// Convertit en map pour Firestore (omet l'id).
+  /// Convertit une instance Slot en map pour Firestore.
   Map<String, dynamic> toMap() {
     return {
+      'questId': questId,
       'startTime': Timestamp.fromDate(startTime),
       'duration': duration,
       'reserved': reserved,
       'priceCents': priceCents,
       'currency': currency,
       'taxRate': taxRate,
-      'reductions': reductions.map((r) => r.toMap()).toList(),
+      'discountCount': discountCount,
       'recurrence': recurrence,
       'recurrenceGroupId': recurrenceGroupId,
       'exceptions': exceptions.map((d) => Timestamp.fromDate(d)).toList(),
@@ -109,16 +112,17 @@ class Slot {
     };
   }
 
-  /// Copie le slot en remplaçant certains champs.
+  /// Copie une instance Slot avec des modifications partielles.
   Slot copyWith({
     String? id,
+    String? questId,
     DateTime? startTime,
     int? duration,
     bool? reserved,
     int? priceCents,
     String? currency,
     double? taxRate,
-    List<Reduction>? reductions,
+    int? discountCount,
     Map<String, dynamic>? recurrence,
     String? recurrenceGroupId,
     List<DateTime>? exceptions,
@@ -126,40 +130,18 @@ class Slot {
   }) {
     return Slot(
       id: id ?? this.id,
+      questId: questId ?? this.questId,
       startTime: startTime ?? this.startTime,
       duration: duration ?? this.duration,
       reserved: reserved ?? this.reserved,
       priceCents: priceCents ?? this.priceCents,
       currency: currency ?? this.currency,
       taxRate: taxRate ?? this.taxRate,
-      reductions: reductions ?? this.reductions,
+      discountCount: discountCount ?? this.discountCount,
       recurrence: recurrence ?? this.recurrence,
       recurrenceGroupId: recurrenceGroupId ?? this.recurrenceGroupId,
       exceptions: exceptions ?? this.exceptions,
       createdAt: createdAt ?? this.createdAt,
     );
   }
-
-  @override
-  String toString() {
-    return 'Slot(id: $id, startTime: $startTime, duration: $duration, '
-        'reserved: $reserved, priceCents: $priceCents $currency)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is Slot &&
-        other.id == id &&
-        other.startTime == startTime &&
-        other.duration == duration &&
-        other.reserved == reserved &&
-        other.priceCents == priceCents &&
-        other.currency == currency &&
-        other.taxRate == taxRate;
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, startTime, duration, reserved, priceCents, currency);
 }
