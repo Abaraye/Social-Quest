@@ -1,12 +1,12 @@
 // =============================================================
-// lib/models/partner.dart  – v2 (photos, ratings, geohash …)
+// lib/models/partner.dart  – v3 (fields ownerId, phone ajoutés)
 // =============================================================
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Modèle d’activité / partenaire
 ///
 /// ⚠️  Tous les champs non obligatoires sont optionnels pour conserver la
-/// compatibilité ascendante. Les helpers fournissent des valeurs sûres.
+/// compatibilité ascendante.
 class Partner {
   final String id;
   final String name;
@@ -16,9 +16,13 @@ class Partner {
   final double latitude;
   final double longitude;
 
-  // ➕ Nouveaux champs
-  final List<String> photos; // urls HTTPS (peut être vide)
-  final double? avgRating; // moyenne sur 5  (null si aucune review)
+  // ➕ Nouveaux champs propriétaires
+  final String ownerId; // UID du propriétaire marchand
+  final String phone; // Téléphone du commerce
+
+  // ➕ Autres champs existants
+  final List<String> photos; // URLs HTTPS (peut être vide)
+  final double? avgRating; // moyenne sur 5 (null si aucune review)
   final int? reviewsCount; // nombre d’avis
   final String? geohash; // pour GeoFlutterFire (optionnel)
   final bool active; // soft delete / masquage
@@ -37,6 +41,8 @@ class Partner {
     required this.category,
     required this.latitude,
     required this.longitude,
+    required this.ownerId,
+    required this.phone,
     required this.photos,
     this.avgRating,
     this.reviewsCount,
@@ -49,20 +55,22 @@ class Partner {
   // ---------------- JSON / Firestore helpers ----------------
 
   factory Partner.fromJson(Map<String, dynamic> json) => Partner(
-    id: json['id'],
-    name: json['name'],
-    description: json['description'],
-    address: json['address'] ?? '',
-    category: json['category'] ?? '',
+    id: json['id'] as String,
+    name: json['name'] as String,
+    description: json['description'] as String,
+    address: json['address'] as String? ?? '',
+    category: json['category'] as String? ?? '',
     latitude: (json['latitude'] ?? 0.0).toDouble(),
     longitude: (json['longitude'] ?? 0.0).toDouble(),
+    ownerId: json['ownerId'] as String? ?? '', // ← fallback vide
+    phone: json['phone'] as String? ?? '', // ← fallback vide
     photos: List<String>.from(json['photos'] ?? []),
     avgRating: (json['avgRating'] as num?)?.toDouble(),
-    reviewsCount: json['reviewsCount'],
-    geohash: json['geohash'],
-    active: json['active'] ?? true,
+    reviewsCount: json['reviewsCount'] as int?,
+    geohash: json['geohash'] as String?,
+    active: json['active'] as bool? ?? true,
     slots: {},
-    maxReduction: json['maxReduction'],
+    maxReduction: json['maxReduction'] as int?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +81,8 @@ class Partner {
     'category': category,
     'latitude': latitude,
     'longitude': longitude,
+    'ownerId': ownerId,
+    'phone': phone,
     'photos': photos,
     'avgRating': avgRating,
     'reviewsCount': reviewsCount,
@@ -82,7 +92,7 @@ class Partner {
   };
 
   factory Partner.fromMap(Map<String, dynamic> data, String id) {
-    final rawSlots = data['slots'] ?? {};
+    final rawSlots = data['slots'] as Map<String, dynamic>? ?? {};
     final parsedSlots = <String, List<Map<String, dynamic>>>{};
     for (final entry in rawSlots.entries) {
       parsedSlots[entry.key] = List<Map<String, dynamic>>.from(
@@ -92,19 +102,21 @@ class Partner {
 
     return Partner(
       id: id,
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      address: data['address'] ?? '',
-      category: data['category'] ?? '',
+      name: data['name'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      address: data['address'] as String? ?? '',
+      category: data['category'] as String? ?? '',
       latitude: (data['latitude'] ?? 0.0).toDouble(),
       longitude: (data['longitude'] ?? 0.0).toDouble(),
+      ownerId: data['ownerId'] as String? ?? '',
+      phone: data['phone'] as String? ?? '',
       photos: List<String>.from(data['photos'] ?? []),
       avgRating: (data['avgRating'] as num?)?.toDouble(),
-      reviewsCount: data['reviewsCount'],
-      geohash: data['geohash'],
-      active: data['active'] ?? true,
+      reviewsCount: data['reviewsCount'] as int?,
+      geohash: data['geohash'] as String?,
+      active: data['active'] as bool? ?? true,
       slots: parsedSlots,
-      maxReduction: data['maxReduction'],
+      maxReduction: data['maxReduction'] as int?,
     );
   }
 
@@ -115,6 +127,8 @@ class Partner {
     'category': category,
     'latitude': latitude,
     'longitude': longitude,
+    'ownerId': ownerId,
+    'phone': phone,
     'photos': photos,
     'avgRating': avgRating,
     'reviewsCount': reviewsCount,

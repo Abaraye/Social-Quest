@@ -1,150 +1,113 @@
-// -----------------------------------------------------------------------------
-// GoRouter – sprint-1-light (aucun import ni classe manquants)
-// -----------------------------------------------------------------------------
+// lib/core/routing/app_router.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mvp_social_quest/screens/auth/user_type_selector_page.dart';
-import 'package:mvp_social_quest/screens/favorites/favorites_page.dart';
-import 'package:mvp_social_quest/screens/profile/profile_page.dart';
+import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart'
+    show GoRouter, GoRoute, ShellRoute, GoRouterRefreshStream;
 
-// Models + stub service
+import 'package:mvp_social_quest/core/providers/auth_provider.dart';
+import 'package:mvp_social_quest/screens/partners/partner_edit_page.dart';
+
+import '../providers/user_type_provider.dart';
+import '../providers/partner_provider.dart';
 import '../../models/partner.dart';
-import '../../services/firestore/partner_service.dart';
+import '../../models/quest.dart';
+import '../../models/slot.dart';
 
-// Pages utilisateur
+// Pages
 import '../../screens/welcome/welcome_page.dart';
 import '../../screens/auth/login_page.dart';
 import '../../screens/auth/signup_page.dart';
+import '../../screens/auth/user_type_selector_page.dart';
 import '../../screens/explore/explore_page.dart';
 import '../../screens/explore/quest_page.dart';
+import '../../screens/explore/quest_detail_page.dart';
 import '../../screens/booking/booking_page.dart';
 import '../../screens/booking/booking_details_page.dart';
-
-// Pages commerçant existantes
-import '../../screens/partners/partner_dashboard_page.dart';
+import '../../screens/favorites/favorites_page.dart';
+import '../../screens/profile/profile_page.dart';
 import '../../screens/partners/partner_onboarding_page.dart';
-import '../../screens/partners/partner_slots_calendar_page.dart';
+import '../../screens/partners/partner_dashboard_page.dart';
+import '../../screens/partners/partner_bookings_page.dart';
+import '../../screens/partners/partner_profile_page.dart';
 import '../../screens/partners/quest_form_page.dart';
-import '../../screens/partners/slot_form_page.dart';
+import '../../screens/partners/partner_slots_calendar_page.dart';
+import '../../screens/splash/splash_page.dart';
 
-// -----------------------------------------------------------------------------
-// Transition fade générique
-CustomTransitionPage<T> _fade<T>(Widget child) => CustomTransitionPage<T>(
-  transitionsBuilder:
-      (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+// Nav
+import '../../core/navigation/user_nav_items.dart' as user_nav;
+import '../../core/navigation/merchant_nav_items.dart' as merchant_nav;
+
+// Auth
+import '../../widgets/auth_gate.dart';
+
+CustomTransitionPage<T> _fade<T>(Widget child) => CustomTransitionPage(
   child: child,
+  transitionsBuilder:
+      (_, anim, __, c) => FadeTransition(opacity: anim, child: c),
 );
 
-// -----------------------------------------------------------------------------
-// Refresh notifier (auth + partenaires)
-class _Refresh extends ChangeNotifier {
-  StreamSubscription<User?>? _authSub;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
-  StreamSubscription<List<Partner>>? _partnersSub;
-
-  _Refresh() {
-    _authSub = FirebaseAuth.instance.authStateChanges().listen(_onAuth);
-  }
-
-  void _onAuth(User? user) {
-    notifyListeners();
-    _profileSub?.cancel();
-    _partnersSub?.cancel();
-
-    if (user != null) {
-      _profileSub = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .snapshots()
-          .listen((_) => notifyListeners());
-
-      _partnersSub = PartnerService.streamPartners().listen(
-        (_) => notifyListeners(),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _authSub?.cancel();
-    _profileSub?.cancel();
-    _partnersSub?.cancel();
-    super.dispose();
-  }
-}
-
-final _refresh = _Refresh();
-
-// -----------------------------------------------------------------------------
-// Providers (singulier)
-final partnerProvider = StreamProvider.autoDispose<List<Partner>>(
-  (ref) => PartnerService.streamPartners(),
-);
-
-final userProfileProvider = StreamProvider.autoDispose<Map<String, dynamic>?>((
-  ref,
-) {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .snapshots()
-      .map((s) => s.data());
-});
-
-final userTypeProvider = Provider<String?>(
-  (ref) => ref
-      .watch(userProfileProvider)
-      .maybeWhen(data: (d) => d?['type'] as String?, orElse: () => null),
-);
-
-// -----------------------------------------------------------------------------
-// Router principal
 final routerProvider = Provider<GoRouter>((ref) {
+  final auth = ref.watch(authProvider);
+  print('[routerProvider] auth.state = ${auth.value}');
+
+  if (auth.isLoading) {
+    return GoRouter(
+      routes: [GoRoute(path: '/', builder: (_, __) => const SplashPage())],
+    );
+  }
+
+  final user = auth.value;
+  final loggedIn = user != null;
+
   return GoRouter(
     debugLogDiagnostics: true,
-    refreshListenable: _refresh,
+    refreshListenable: _AuthChangeNotifier(),
 
-    /* ------------------- redirect global ------------------- */
-    redirect: (context, state) {
-      final loggedIn = FirebaseAuth.instance.currentUser != null;
-      final loc = state.uri.toString();
-      const pub = ['/welcome', '/login', '/signup'];
-      final isPublic = pub.contains(loc) || loc.startsWith('/signup/');
+    redirect: (ctx, state) {
+      final loc = state.matchedLocation;
+      final user = auth.value;
 
-      if (!loggedIn && !isPublic) return '/welcome';
-
-      final type = ref.read(userTypeProvider);
-
-      // Redirection marchands ➜ onboarding si pas encore de partenaire
-      if (loggedIn && type == 'merchant') {
-        final partnersAsync = ref.read(partnerProvider);
-        return partnersAsync.maybeWhen(
-          data: (list) {
-            if (list.isEmpty && !loc.startsWith('/merchant/onboarding')) {
-              return '/merchant/onboarding';
-            }
-            return null;
-          },
-          orElse: () => null,
-        );
+      if (user == null &&
+          !['/login', '/signup', '/welcome'].any(loc.startsWith)) {
+        return '/welcome';
       }
+
+      // 1️⃣ attendre userTypeProvider
+      final userTypeAsync = ref.watch(userTypeProvider);
+      if (userTypeAsync.isLoading) return null;
+      final userType = userTypeAsync.value;
+
+      // 2️⃣ logique marchand
+      if (userType == 'merchant') {
+        final partnersAsync = ref.watch(partnerListProvider);
+        if (partnersAsync.isLoading) return null;
+
+        final partners = partnersAsync.value ?? [];
+        if (partners.isEmpty && !loc.startsWith('/merchant/onboarding')) {
+          return '/merchant/onboarding';
+        }
+        if (partners.isNotEmpty && !loc.startsWith('/dashboard')) {
+          return '/dashboard/${partners.first.id}';
+        }
+      }
+
+      // 3️⃣ logique user
+      if (userType == 'user' && !loc.startsWith('/home')) {
+        return '/home';
+      }
+
       return null;
     },
 
-    /* ------------------------ routes ----------------------- */
     routes: [
-      // Public / Auth
       GoRoute(
         path: '/welcome',
-        pageBuilder: (_, __) => _fade<void>(const WelcomePage()),
+        pageBuilder: (_, __) => _fade(const WelcomePage()),
       ),
-      GoRoute(path: '/login', pageBuilder: (_, __) => _fade(LoginPage())),
+      GoRoute(path: '/login', pageBuilder: (_, __) => _fade(const LoginPage())),
       GoRoute(
         path: '/signup',
         pageBuilder: (_, __) => _fade(const UserTypeSelectorPage()),
@@ -152,103 +115,206 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/signup/:userType',
         pageBuilder:
-            (_, s) =>
-                _fade(SignUpPage(userType: s.pathParameters['userType']!)),
+            (_, st) =>
+                _fade(SignupPage(userType: st.pathParameters['userType']!)),
       ),
-
-      // ---------- Shell utilisateur (bottom-nav) ----------
+      GoRoute(
+        path: '/merchant/onboarding',
+        pageBuilder: (_, __) => _fade(const PartnerOnboardingPage()),
+      ),
       ShellRoute(
-        builder: (_, __, child) => _UserShell(child: child),
+        builder: (_, __, child) => _MerchantShell(child: child),
         routes: [
-          GoRoute(path: '/', pageBuilder: (_, __) => _fade(ExplorePage())),
+          // 1️⃣ route dashboard RELATIVE
           GoRoute(
-            path: '/quest/:id',
+            path: '/dashboard/:pid',
             pageBuilder:
-                (_, s) => _fade(QuestPage(questId: s.pathParameters['id']!)),
-          ),
-          GoRoute(
-            path: '/bookings',
-            pageBuilder: (_, __) => _fade(BookingPage()),
-          ),
-          GoRoute(
-            path: '/favorites',
-            pageBuilder: (_, __) => _fade(FavoritesPage()),
-          ),
-          GoRoute(
-            path: '/profile',
-            pageBuilder: (_, __) => _fade(ProfilePage()),
-          ),
-          GoRoute(
-            path: '/booking/:id',
-            pageBuilder:
-                (_, s) => _fade(
-                  BookingDetailsPage(bookingId: s.pathParameters['id']!),
+                (_, st) => _fade(
+                  PartnerDashboardPage(partnerId: st.pathParameters['pid']!),
                 ),
+            routes: [
+              // 2️⃣ toutes RELATIVES
+              GoRoute(
+                path: 'bookings',
+                pageBuilder:
+                    (_, st) => _fade(
+                      PartnerBookingsPage(partnerId: st.pathParameters['pid']!),
+                    ),
+              ),
+              GoRoute(
+                path: 'profile',
+                pageBuilder:
+                    (_, st) => _fade(
+                      PartnerProfilePage(partnerId: st.pathParameters['pid']!),
+                    ),
+              ),
+              GoRoute(
+                path: 'quest/new',
+                pageBuilder:
+                    (_, st) => _fade(
+                      QuestFormPage(partnerId: st.pathParameters['pid']!),
+                    ),
+              ),
+              GoRoute(
+                path: 'quest/:qid/edit',
+                pageBuilder:
+                    (_, st) => _fade(
+                      QuestFormPage(
+                        partnerId: st.pathParameters['pid']!,
+                        existing: st.extra as Quest?,
+                      ),
+                    ),
+              ),
+
+              GoRoute(
+                path: 'quest/:qid',
+                pageBuilder:
+                    (_, st) => _fade(
+                      QuestDetailPage(
+                        partnerId: st.pathParameters['pid']!,
+                        questId: st.pathParameters['qid']!,
+                      ),
+                    ),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    pageBuilder:
+                        (_, st) => _fade(
+                          QuestFormPage(
+                            partnerId: st.pathParameters['pid']!,
+                            existing: st.extra as Quest?,
+                          ),
+                        ),
+                  ),
+                  GoRoute(
+                    path: 'slots',
+                    pageBuilder:
+                        (_, st) => _fade(
+                          PartnerSlotsCalendarPage(
+                            partnerId: st.pathParameters['pid']!,
+                            questId: st.pathParameters['qid']!,
+                          ),
+                        ),
+                    routes: [],
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
 
-      // ---------------------- Merchant ----------------------
-      GoRoute(
-        path: '/merchant/onboarding',
-        pageBuilder: (_, __) => _fade(PartnerOnboardingPage()),
+      ShellRoute(
+        builder: (c, s, child) => _UserShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/home',
+            pageBuilder: (_, __) => _fade(const ExplorePage()),
+            routes: [
+              GoRoute(
+                path: 'quest/:id',
+                pageBuilder:
+                    (_, st) =>
+                        _fade(QuestPage(questId: st.pathParameters['id']!)),
+              ),
+              GoRoute(
+                path: 'bookings',
+                pageBuilder: (_, __) => _fade(const BookingPage()),
+              ),
+              GoRoute(
+                path: 'booking/:id',
+                pageBuilder:
+                    (_, st) => _fade(
+                      BookingDetailsPage(bookingId: st.pathParameters['id']!),
+                    ),
+              ),
+              GoRoute(
+                path: 'favorites',
+                pageBuilder: (_, __) => _fade(const FavoritesPage()),
+              ),
+              GoRoute(
+                path: 'profile',
+                pageBuilder: (_, __) => _fade(const ProfilePage()),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
-        path: '/merchant/dashboard',
-        pageBuilder: (_, __) => _fade(PartnerDashboardPage()),
+        path: '/dashboard/partner/new',
+        pageBuilder: (_, __) => _fade(const PartnerEditPage()),
       ),
       GoRoute(
-        path: '/merchant/slots',
-        pageBuilder: (_, __) => _fade(PartnerSlotsCalendarPage()),
+        path: '/dashboard/partner/:id/edit',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return _fade(PartnerEditPage(partnerId: id));
+        },
       ),
       GoRoute(
-        path: '/merchant/quest/form',
-        pageBuilder: (_, __) => _fade(QuestFormPage()),
-      ),
-      GoRoute(
-        path: '/merchant/slot/form',
-        pageBuilder: (_, __) => _fade(SlotFormPage()),
+        path: '/',
+        pageBuilder: (_, __) => _fade(const AuthGate(child: SizedBox())),
       ),
     ],
   );
 });
 
-/* -------------------------------------------------------------------------- */
-/*                                Shell UI                                    */
-/* -------------------------------------------------------------------------- */
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier() {
+    _sub = FirebaseAuth.instance.authStateChanges().listen((_) {
+      notifyListeners();
+    });
+  }
 
-class _UserShell extends StatefulWidget {
-  final Widget child;
-  const _UserShell({Key? key, required this.child}) : super(key: key);
+  late final StreamSubscription<User?> _sub;
 
   @override
-  State<_UserShell> createState() => __UserShellState();
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
 }
 
-class __UserShellState extends State<_UserShell> {
-  int _current = 0;
-  static const _tabs = ['/', '/bookings', '/favorites', '/profile'];
+class _UserShell extends StatelessWidget {
+  const _UserShell({required this.child});
+  final Widget child;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: widget.child,
-    bottomNavigationBar: BottomNavigationBar(
-      currentIndex: _current,
-      onTap: (i) {
-        if (i != _current) {
-          setState(() => _current = i);
-          context.go(_tabs[i]);
-        }
-      },
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: Colors.deepPurple,
-      unselectedItemColor: Colors.grey,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explorer'),
-        BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Réservations'),
-        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favoris'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
-      ],
-    ),
-  );
+  Widget build(BuildContext c) {
+    final idx = user_nav.indexFromPath(GoRouterState.of(c).matchedLocation);
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: idx,
+        onTap: (i) => c.go(user_nav.userNavItems[i].path),
+        items: [
+          for (final it in user_nav.userNavItems)
+            BottomNavigationBarItem(icon: Icon(it.icon), label: it.label),
+        ],
+      ),
+    );
+  }
+}
+
+class _MerchantShell extends StatelessWidget {
+  const _MerchantShell({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext c) {
+    final st = GoRouterState.of(c);
+    final pid = st.pathParameters['pid']!;
+    final idx = merchant_nav.indexFromPath(pid, st.matchedLocation);
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: idx,
+        onTap: (i) => c.go(merchant_nav.merchantNavItems[i].buildPath(pid)),
+        items: [
+          for (final it in merchant_nav.merchantNavItems)
+            BottomNavigationBarItem(icon: Icon(it.icon), label: it.label),
+        ],
+      ),
+    );
+  }
 }

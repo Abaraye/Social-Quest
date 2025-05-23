@@ -11,14 +11,14 @@ class AuthFormField extends StatelessWidget {
   final IconData? icon; // on réintroduit l’icône
 
   const AuthFormField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.label,
     this.validator,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
     this.icon, // nommé
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

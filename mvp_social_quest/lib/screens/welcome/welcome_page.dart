@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class WelcomePage extends StatefulWidget {
-  const WelcomePage({Key? key}) : super(key: key);
+  const WelcomePage({super.key});
 
   @override
   State<WelcomePage> createState() => _WelcomePageState();
@@ -65,6 +65,7 @@ class _WelcomePageState extends State<WelcomePage>
                   label: const Text("Créer un compte"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white, // ← texte et icône en blanc
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -72,6 +73,7 @@ class _WelcomePageState extends State<WelcomePage>
                   ),
                   onPressed: () => context.push('/signup'),
                 ),
+
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.login),

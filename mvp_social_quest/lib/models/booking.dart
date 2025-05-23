@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mvp_social_quest/core/utils/date_mapper.dart';
 
-/// 📦 Modèle Booking : représente une réservation d'activité
 class Booking {
   final String id;
   final String userId;
@@ -10,7 +10,7 @@ class Booking {
   final int peopleCount;
   final int totalPriceCents;
   final String currency;
-  final String status; // 'confirmed', 'canceled', etc.
+  final String status;
   final DateTime startTime;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -30,39 +30,37 @@ class Booking {
     required this.updatedAt,
   });
 
-  /// 🔄 Factory pour recréer un Booking à partir d'un document Firestore
-  factory Booking.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data()!;
-    return Booking(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      partnerId: data['partnerId'] ?? '',
-      questId: data['questId'] ?? '',
-      slotId: data['slotId'] ?? '',
-      peopleCount: data['peopleCount'] ?? 1,
-      totalPriceCents: data['totalPriceCents'] ?? 0,
-      currency: data['currency'] ?? 'EUR',
-      status: data['status'] ?? 'confirmed',
-      startTime: (data['startTime'] as Timestamp).toDate(),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
-    );
-  }
+  /* ---------- Firestore doc ---------- */
+  factory Booking.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
+      Booking.fromJson({'id': doc.id, ...?doc.data()});
 
-  /// 🔄 Transforme un Booking en Map pour Firestore
-  Map<String, dynamic> toMap() {
-    return {
-      'userId': userId,
-      'partnerId': partnerId,
-      'questId': questId,
-      'slotId': slotId,
-      'peopleCount': peopleCount,
-      'totalPriceCents': totalPriceCents,
-      'currency': currency,
-      'status': status,
-      'startTime': Timestamp.fromDate(startTime),
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
-    };
-  }
+  /* ---------- JSON “pur” ---------- */
+  factory Booking.fromJson(Map<String, dynamic> json) => Booking(
+    id: json['id'] as String,
+    userId: json['userId'] as String,
+    partnerId: json['partnerId'] as String,
+    questId: json['questId'] as String,
+    slotId: json['slotId'] as String,
+    peopleCount: json['peopleCount'] as int,
+    totalPriceCents: json['totalPriceCents'] as int,
+    currency: json['currency'] as String,
+    status: json['status'] as String,
+    startTime: toDate(json['startTime'])!,
+    createdAt: toDate(json['createdAt'])!,
+    updatedAt: toDate(json['updatedAt'])!,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'userId': userId,
+    'partnerId': partnerId,
+    'questId': questId,
+    'slotId': slotId,
+    'peopleCount': peopleCount,
+    'totalPriceCents': totalPriceCents,
+    'currency': currency,
+    'status': status,
+    'startTime': toTimestamp(startTime),
+    'createdAt': toTimestamp(createdAt),
+    'updatedAt': toTimestamp(updatedAt),
+  };
 }

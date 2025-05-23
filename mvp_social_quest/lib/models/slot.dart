@@ -1,50 +1,35 @@
-// lib/models/slot.dart
 // -----------------------------------------------------------------------------
-// Modèle de créneau horaire (Slot), lié à une Quest.
-// Mise à jour : Suppression de la liste de réductions directe.
-// Les réductions sont désormais une sous-collection Firestore.
-
+// Modèle Slot : créneau horaire lié à une Quest
+// -----------------------------------------------------------------------------
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Helpers génériques ----------------------------------------------------------------
+DateTime? _toDate(dynamic v) {
+  if (v == null) return null;
+  if (v is Timestamp) return v.toDate();
+  if (v is String) return DateTime.parse(v);
+  throw ArgumentError('Unsupported date value: $v');
+}
+
+Timestamp? _toTimestamp(DateTime? d) =>
+    d == null ? null : Timestamp.fromDate(d);
+
+/// Modèle ---------------------------------------------------------------------------
 class Slot {
-  /// Identifiant Firestore du document.
   final String id;
-
-  /// Identifiant de la Quest associée.
   final String questId;
-
-  /// Date et heure de début du créneau.
   final DateTime startTime;
-
-  /// Durée du créneau en minutes.
   final int duration;
-
-  /// Statut de réservation (false par défaut).
   final bool reserved;
-
-  /// Prix TTC en centimes d'euro.
   final int priceCents;
-
-  /// Devise ISO-4217 ("EUR" par défaut).
   final String currency;
-
-  /// Taux de TVA applicable (optionnel).
   final double? taxRate;
-
-  /// Nombre de réductions associées (champ pratique pour UI).
   final int discountCount;
-
-  /// Paramètres de récurrence (facultatif).
   final Map<String, dynamic>? recurrence;
-
-  /// Identifiant de groupe de récurrence.
   final String? recurrenceGroupId;
-
-  /// Dates d'exceptions (exclusions de récurrence).
   final List<DateTime> exceptions;
-
-  /// Timestamp de création.
   final DateTime? createdAt;
+  final int capacity;
 
   const Slot({
     required this.id,
@@ -60,59 +45,57 @@ class Slot {
     this.recurrenceGroupId,
     this.exceptions = const [],
     this.createdAt,
+    this.capacity = 1,
   });
 
-  /// Crée une instance Slot depuis une map Firestore.
-  factory Slot.fromMap(Map<String, dynamic> map) {
-    return Slot(
-      id: map['id'] as String,
-      questId: map['questId'] as String,
-      startTime: (map['startTime'] as Timestamp).toDate(),
-      duration: map['duration'] as int? ?? 60,
-      reserved: map['reserved'] as bool? ?? false,
-      priceCents: map['priceCents'] as int? ?? 0,
-      currency: map['currency'] as String? ?? 'EUR',
-      taxRate: (map['taxRate'] as num?)?.toDouble(),
-      discountCount: map['discountCount'] as int? ?? 0,
-      recurrence:
-          map['recurrence'] != null
-              ? Map<String, dynamic>.from(map['recurrence'])
-              : null,
-      recurrenceGroupId: map['recurrenceGroupId'] as String?,
-      exceptions:
-          (map['exceptions'] as List<dynamic>?)
-              ?.map((e) => (e as Timestamp).toDate())
-              .toList() ??
-          [],
-      createdAt:
-          map['createdAt'] != null
-              ? (map['createdAt'] as Timestamp).toDate()
-              : null,
-    );
-  }
+  /* ---------- Factory depuis Map Firestore ---------- */
+  factory Slot.fromMap(Map<String, dynamic> map) => Slot(
+    id: map['id'] as String,
+    questId: map['questId'] as String,
+    startTime: _toDate(map['startTime'])!,
+    duration: map['duration'] as int? ?? 60,
+    reserved: map['reserved'] as bool? ?? false,
+    priceCents: map['priceCents'] as int? ?? 0,
+    currency: map['currency'] as String? ?? 'EUR',
+    taxRate: (map['taxRate'] as num?)?.toDouble(),
+    discountCount: map['discountCount'] as int? ?? 0,
+    recurrence:
+        map['recurrence'] != null
+            ? Map<String, dynamic>.from(map['recurrence'])
+            : null,
+    recurrenceGroupId: map['recurrenceGroupId'] as String?,
+    exceptions:
+        (map['exceptions'] as List<dynamic>?)
+            ?.map((e) => _toDate(e)!)
+            .toList() ??
+        [],
+    createdAt: _toDate(map['createdAt']),
+    capacity: map['duration'] as int? ?? 1,
+  );
 
-  /// Convertit une instance Slot en map pour Firestore.
-  Map<String, dynamic> toMap() {
-    return {
-      'questId': questId,
-      'startTime': Timestamp.fromDate(startTime),
-      'duration': duration,
-      'reserved': reserved,
-      'priceCents': priceCents,
-      'currency': currency,
-      'taxRate': taxRate,
-      'discountCount': discountCount,
-      'recurrence': recurrence,
-      'recurrenceGroupId': recurrenceGroupId,
-      'exceptions': exceptions.map((d) => Timestamp.fromDate(d)).toList(),
-      'createdAt':
-          createdAt != null
-              ? Timestamp.fromDate(createdAt!)
-              : FieldValue.serverTimestamp(),
-    };
-  }
+  /* ---------- JSON <-> Model ---------- */
+  factory Slot.fromJson(Map<String, dynamic> json) => Slot.fromMap(json);
 
-  /// Copie une instance Slot avec des modifications partielles.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'questId': questId,
+    'startTime': _toTimestamp(startTime),
+    'duration': duration,
+    'reserved': reserved,
+    'priceCents': priceCents,
+    'currency': currency,
+    'taxRate': taxRate,
+    'discountCount': discountCount,
+    'recurrence': recurrence,
+    'recurrenceGroupId': recurrenceGroupId,
+    'exceptions': exceptions
+        .map((d) => _toTimestamp(d))
+        .toList(growable: false),
+    'createdAt': _toTimestamp(createdAt) ?? FieldValue.serverTimestamp(),
+    'capacity': capacity,
+  };
+
+  /* ---------- Utilitaire copyWith ---------- */
   Slot copyWith({
     String? id,
     String? questId,
@@ -127,21 +110,29 @@ class Slot {
     String? recurrenceGroupId,
     List<DateTime>? exceptions,
     DateTime? createdAt,
-  }) {
-    return Slot(
-      id: id ?? this.id,
-      questId: questId ?? this.questId,
-      startTime: startTime ?? this.startTime,
-      duration: duration ?? this.duration,
-      reserved: reserved ?? this.reserved,
-      priceCents: priceCents ?? this.priceCents,
-      currency: currency ?? this.currency,
-      taxRate: taxRate ?? this.taxRate,
-      discountCount: discountCount ?? this.discountCount,
-      recurrence: recurrence ?? this.recurrence,
-      recurrenceGroupId: recurrenceGroupId ?? this.recurrenceGroupId,
-      exceptions: exceptions ?? this.exceptions,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
+    int? capacity,
+  }) => Slot(
+    id: id ?? this.id,
+    questId: questId ?? this.questId,
+    startTime: startTime ?? this.startTime,
+    duration: duration ?? this.duration,
+    reserved: reserved ?? this.reserved,
+    priceCents: priceCents ?? this.priceCents,
+    currency: currency ?? this.currency,
+    taxRate: taxRate ?? this.taxRate,
+    discountCount: discountCount ?? this.discountCount,
+    recurrence: recurrence ?? this.recurrence,
+    recurrenceGroupId: recurrenceGroupId ?? this.recurrenceGroupId,
+    exceptions: exceptions ?? this.exceptions,
+    createdAt: createdAt ?? this.createdAt,
+    capacity: capacity ?? this.capacity,
+  );
+  // Durée en minutes → calcule endTime
+  DateTime get endTime => startTime.add(Duration(minutes: duration));
+
+  // Nb de réservations (placeholder pour l’instant)
+  int get bookedCount => 0; // TODO: connecter aux bookings
+
+  // Réductions (placeholder vide pour le moment)
+  List<String> get discounts => []; // TODO: connecter à Firestore plus tard
 }

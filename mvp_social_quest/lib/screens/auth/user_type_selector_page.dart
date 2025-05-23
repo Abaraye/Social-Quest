@@ -29,11 +29,12 @@ class UserTypeSelectorPage extends StatelessWidget {
             ElevatedButton.icon(
               icon: const Icon(Icons.store),
               label: const Text('Je suis un commerçant'),
-              onPressed: () => _goToSignUp(context, 'merchant'),
               style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(56),
                 backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white, // ← texte et icône en blanc
+                minimumSize: const Size.fromHeight(56),
               ),
+              onPressed: () => _goToSignUp(context, 'merchant'),
             ),
           ],
         ),

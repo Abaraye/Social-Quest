@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mvp_social_quest/core/utils/date_mapper.dart';
 
 class Quest {
   Quest({
@@ -65,6 +66,28 @@ class Quest {
     );
   }
 
+  /* ---------- JSON ---------- */
+
+  /* ---------- JSON Firestore ---------- */
+  factory Quest.fromJson(Map<String, dynamic> json) => Quest(
+    id: json['id'] as String,
+    partnerId: json['partnerId'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    priceCents: json['priceCents'] as int,
+    currency: json['currency'] as String,
+    photos: List<String>.from(json['photos'] ?? const []),
+    capacity: json['capacity'] ?? 0,
+    bookedCount: json['bookedCount'] ?? 0,
+    startsAt: toDate(json['startsAt']),
+    endsAt: toDate(json['endsAt']),
+    avgRating: (json['avgRating'] ?? 0).toDouble(),
+    reviewsCount: json['reviewsCount'] ?? 0,
+    isActive: json['isActive'] ?? true,
+    createdAt: toDate(json['createdAt'])!,
+    updatedAt: toDate(json['updatedAt'])!,
+  );
+
   Map<String, dynamic> toJson() => {
     'partnerId': partnerId,
     'title': title,
@@ -74,12 +97,52 @@ class Quest {
     'photos': photos,
     'capacity': capacity,
     'bookedCount': bookedCount,
-    'startsAt': startsAt,
-    'endsAt': endsAt,
+    'startsAt': toTimestamp(startsAt),
+    'endsAt': toTimestamp(endsAt),
     'avgRating': avgRating,
     'reviewsCount': reviewsCount,
     'isActive': isActive,
-    'createdAt': createdAt,
-    'updatedAt': updatedAt,
+    'createdAt': toTimestamp(createdAt),
+    'updatedAt': toTimestamp(updatedAt),
   };
+}
+
+extension QuestCopyWith on Quest {
+  Quest copyWith({
+    String? id,
+    String? partnerId,
+    String? title,
+    String? description,
+    int? priceCents,
+    String? currency,
+    List<String>? photos,
+    int? capacity,
+    int? bookedCount,
+    DateTime? startsAt,
+    DateTime? endsAt,
+    double? avgRating,
+    int? reviewsCount,
+    bool? isActive,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Quest(
+      id: id ?? this.id,
+      partnerId: partnerId ?? this.partnerId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      priceCents: priceCents ?? this.priceCents,
+      currency: currency ?? this.currency,
+      photos: photos ?? this.photos,
+      capacity: capacity ?? this.capacity,
+      bookedCount: bookedCount ?? this.bookedCount,
+      startsAt: startsAt ?? this.startsAt,
+      endsAt: endsAt ?? this.endsAt,
+      avgRating: avgRating ?? this.avgRating,
+      reviewsCount: reviewsCount ?? this.reviewsCount,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

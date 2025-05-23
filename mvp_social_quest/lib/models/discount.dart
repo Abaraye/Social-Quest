@@ -19,15 +19,13 @@ class Discount {
     required this.createdAt,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'type': type.name,
-      'details': details,
-      'createdAt': Timestamp.fromDate(createdAt),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'details': details,
+    'createdAt': Timestamp.fromDate(createdAt),
+  };
 
-  factory Discount.fromMap(Map<String, dynamic> map) {
+  factory Discount.fromJson(Map<String, dynamic> map) {
     return Discount(
       id: map['id'] ?? '',
       type: DiscountType.values.firstWhere(
@@ -36,6 +34,20 @@ class Discount {
       ),
       details: Map<String, dynamic>.from(map['details'] ?? {}),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+    );
+  }
+
+  Discount copyWith({
+    String? id,
+    DiscountType? type,
+    Map<String, dynamic>? details,
+    DateTime? createdAt,
+  }) {
+    return Discount(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      details: details ?? this.details,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }
