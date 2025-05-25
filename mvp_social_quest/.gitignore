@@ -65,7 +65,10 @@ functions/lib/
 # Dotenv & secrets
 .env
 .env.*
-service-account.json      # 👈 clé de service Firebase Admin
+
+# 🔐 Secrets sensibles
+secrets/
+
 
 # Firebase CLI artefacts
 .firebase/
