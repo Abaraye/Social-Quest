@@ -32,7 +32,7 @@ dependencies:
   # UI & i18n
   image_picker: ^1.1.2
   firebase_storage: ^12.4.5
-  intl: ^0.19.0
+  intl: ^0.20.2
   fl_chart: ^0.71.0
   cached_network_image: ^3.4.1
   flutter_rating_bar: ^4.0.1

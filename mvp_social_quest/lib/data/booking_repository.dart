@@ -20,6 +20,16 @@ class BookingRepository implements CrudRepository<Booking> {
     return d.exists ? _f(d) : null;
   }
 
+  Future<List<Booking>> fetchByPartnerId(String partnerId) async {
+    final snap =
+        await _col
+            .where('partnerId', isEqualTo: partnerId)
+            .orderBy('startTime')
+            .get();
+
+    return snap.docs.map((doc) => Booking.fromDoc(doc)).toList();
+  }
+
   @override
   Future<void> save(Booking b) =>
       _col.doc(b.id).set(b.toJson(), SetOptions(merge: true));

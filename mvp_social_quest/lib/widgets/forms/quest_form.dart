@@ -1,11 +1,12 @@
-// lib/widgets/forms/quest_form.dart
 import 'dart:io';
 
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mvp_social_quest/core/providers/service_provider.dart';
+import 'package:mvp_social_quest/models/quest_category.dart';
 import 'package:mvp_social_quest/services/storage_service.dart';
 import 'package:path/path.dart' as path;
 
@@ -15,11 +16,16 @@ import '../../../core/providers/repository_providers.dart';
 import '../../widgets/quest_photo_picker.dart';
 
 class QuestForm extends ConsumerStatefulWidget {
+  final String partnerId;
   final Quest? initial;
   final void Function(Quest quest) onSubmit;
 
-  const QuestForm({Key? key, required this.onSubmit, this.initial})
-    : super(key: key);
+  const QuestForm({
+    Key? key,
+    required this.partnerId,
+    required this.onSubmit,
+    this.initial,
+  }) : super(key: key);
 
   @override
   ConsumerState<QuestForm> createState() => _QuestFormState();
@@ -40,6 +46,8 @@ class _QuestFormState extends ConsumerState<QuestForm> {
   bool _loading = false;
   late final StorageService _storage;
 
+  late QuestCategory _category;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +66,7 @@ class _QuestFormState extends ConsumerState<QuestForm> {
     _startDate = widget.initial?.startsAt;
     _endDate = widget.initial?.endsAt;
     _photoUrls = List.from(widget.initial?.photos ?? []);
+    _category = widget.initial?.category ?? QuestCategory.sport;
   }
 
   @override
@@ -82,9 +91,11 @@ class _QuestFormState extends ConsumerState<QuestForm> {
 
     try {
       final priceCents = (double.tryParse(_price.text.trim()) ?? 0) * 100;
+      final oldPhotoUrls = widget.initial?.photos ?? [];
+
       var quest = Quest(
         id: widget.initial?.id ?? '',
-        partnerId: widget.initial?.partnerId ?? '',
+        partnerId: widget.partnerId,
         title: _title.text.trim(),
         description: _desc.text.trim(),
         priceCents: priceCents.toInt(),
@@ -99,6 +110,7 @@ class _QuestFormState extends ConsumerState<QuestForm> {
         isActive: widget.initial?.isActive ?? true,
         createdAt: widget.initial?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
+        category: _category,
       );
 
       final repo = ref.read(questRepoProvider);
@@ -106,34 +118,38 @@ class _QuestFormState extends ConsumerState<QuestForm> {
       quest = quest.copyWith(id: questId);
 
       final allUrls = List<String>.from(_photoUrls);
+
       for (final picked in _newPhotos) {
         final file = File(picked.path);
-        final ext = path.extension(file.path);
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}';
+        final fileName = DateTime.now().millisecondsSinceEpoch.toString();
         try {
           final url = await _storage.upload('quests/$questId', file, fileName);
           allUrls.add(url);
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Échec upload ${picked.name}: ${e.toString()}'),
-            ),
+            SnackBar(content: Text('Échec upload ${picked.name}: $e')),
           );
         }
       }
 
-      if (!listEquals(allUrls, _photoUrls)) {
-        await repo.updateQuestPhotos(questId, allUrls);
+      final deletedUrls = oldPhotoUrls.where((url) => !allUrls.contains(url));
+      for (final url in deletedUrls) {
+        try {
+          final ref = FirebaseStorage.instance.refFromURL(url);
+          await ref.delete();
+        } catch (e) {
+          debugPrint('Erreur suppression image Firebase Storage: $e');
+        }
       }
+
+      await repo.updateQuestPhotos(questId, allUrls);
 
       setState(() {
         _photoUrls = allUrls;
         _newPhotos.clear();
       });
 
-      widget.onSubmit(quest.copyWith(photos: allUrls));
-    } catch (_) {
-      // Erreur gérée dans boucle ou rethrow
+      widget.onSubmit(quest.copyWith(id: questId, photos: allUrls));
     } finally {
       setState(() => _loading = false);
     }
@@ -164,6 +180,20 @@ class _QuestFormState extends ConsumerState<QuestForm> {
             controller: _desc,
             decoration: const InputDecoration(labelText: 'Description'),
             maxLines: 3,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<QuestCategory>(
+            value: _category,
+            decoration: const InputDecoration(labelText: 'Catégorie'),
+            items:
+                QuestCategory.values.map((cat) {
+                  return DropdownMenuItem(value: cat, child: Text(cat.label));
+                }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _category = value);
+              }
+            },
           ),
           const SizedBox(height: 16),
           ElevatedButton(

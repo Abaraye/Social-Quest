@@ -1,4 +1,3 @@
-// lib/core/providers/quest_repository.dart
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -50,19 +49,49 @@ class QuestRepository implements CrudRepository<Quest> {
   Future<String> uploadPhoto(String questId, File file) async {
     final fileName = file.uri.pathSegments.last;
     final refPath = 'quests/$questId/$fileName';
-
-    // On n'indique plus le bucket à la main,
-    // FirebaseStorage.instance prend celui de vos options
     final ref = FirebaseStorage.instance.ref().child(refPath);
     final task = await ref.putFile(file);
     return await task.ref.getDownloadURL();
   }
 
   /// Met à jour la liste des URLs de photos de la quête
-  Future<void> updateQuestPhotos(String questId, List<String> urls) async {
+  /// Supprime les images qui ne sont plus référencées
+  Future<void> updateQuestPhotos(String questId, List<String> newUrls) async {
+    final oldQuest = await fetch(questId);
+    final oldUrls = oldQuest?.photos ?? [];
+
+    // Identifie les images supprimées par l'utilisateur
+    final deletedUrls = oldUrls.where((url) => !newUrls.contains(url));
+
+    for (final url in deletedUrls) {
+      try {
+        final ref = FirebaseStorage.instance.refFromURL(url);
+        await ref.delete();
+      } catch (e) {
+        // Peut arriver si le fichier n'existe plus ou si URL incorrecte
+        print('Erreur suppression image: $e');
+      }
+    }
+
     await _col.doc(questId).update({
-      'photos': urls,
+      'photos': newUrls,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
+  }
+
+  /// Supprime une quête et toutes ses images associées
+  Future<void> deleteQuestWithPhotos(Quest quest) async {
+    // Supprimer les images
+    for (final url in quest.photos) {
+      try {
+        final ref = FirebaseStorage.instance.refFromURL(url);
+        await ref.delete();
+      } catch (e) {
+        print('Erreur suppression image: $e');
+      }
+    }
+
+    // Supprimer le document Firestore
+    await _col.doc(quest.id).delete();
   }
 }

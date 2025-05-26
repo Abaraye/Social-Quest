@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mvp_social_quest/core/utils/date_mapper.dart';
+import 'package:mvp_social_quest/models/quest_category.dart';
 
 class Quest {
   Quest({
@@ -19,6 +20,7 @@ class Quest {
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
+    required this.category,
   });
 
   final String id;
@@ -42,6 +44,8 @@ class Quest {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final QuestCategory category;
+
   /* ---------- Serialization ---------- */
 
   factory Quest.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -63,12 +67,12 @@ class Quest {
       isActive: d['isActive'] ?? true,
       createdAt: (d['createdAt'] as Timestamp).toDate(),
       updatedAt: (d['updatedAt'] as Timestamp).toDate(),
+      category: QuestCategory.values.byName(d['category'] ?? 'sport'),
     );
   }
 
   /* ---------- JSON ---------- */
 
-  /* ---------- JSON Firestore ---------- */
   factory Quest.fromJson(Map<String, dynamic> json) => Quest(
     id: json['id'] as String,
     partnerId: json['partnerId'] as String,
@@ -86,6 +90,7 @@ class Quest {
     isActive: json['isActive'] ?? true,
     createdAt: toDate(json['createdAt'])!,
     updatedAt: toDate(json['updatedAt'])!,
+    category: QuestCategory.values.byName(json['category'] ?? 'sport'),
   );
 
   Map<String, dynamic> toJson() => {
@@ -104,6 +109,7 @@ class Quest {
     'isActive': isActive,
     'createdAt': toTimestamp(createdAt),
     'updatedAt': toTimestamp(updatedAt),
+    'category': category.name,
   };
 }
 
@@ -125,6 +131,7 @@ extension QuestCopyWith on Quest {
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
+    QuestCategory? category,
   }) {
     return Quest(
       id: id ?? this.id,
@@ -143,6 +150,7 @@ extension QuestCopyWith on Quest {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      category: category ?? this.category,
     );
   }
 }

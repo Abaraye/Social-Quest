@@ -2,6 +2,7 @@
 // Modèle Slot : créneau horaire lié à une Quest
 // -----------------------------------------------------------------------------
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 /// Helpers génériques ----------------------------------------------------------------
 DateTime? _toDate(dynamic v) {
@@ -70,7 +71,7 @@ class Slot {
             .toList() ??
         [],
     createdAt: _toDate(map['createdAt']),
-    capacity: map['duration'] as int? ?? 1,
+    capacity: map['capacity'] as int? ?? 1,
   );
 
   /* ---------- JSON <-> Model ---------- */
@@ -135,4 +136,18 @@ class Slot {
 
   // Réductions (placeholder vide pour le moment)
   List<String> get discounts => []; // TODO: connecter à Firestore plus tard
+}
+
+extension SlotDisplay on Slot {
+  /// Format lisible : Mardi 25 juin à 18:00
+  String get formattedDate {
+    final dateFormat = DateFormat("EEEE d MMMM 'à' HH:mm", 'fr_FR');
+    return dateFormat.format(startTime);
+  }
+
+  /// Réduction calculée (valeur fictive pour l’instant)
+  int get discountPercent {
+    // À adapter si tu stockes une vraie réduction ailleurs
+    return discountCount > 0 ? 10 : 0;
+  }
 }

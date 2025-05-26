@@ -1,23 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
-  function isAuth() {
-    return request.auth != null;   // utilisateur connecté
-  }
-
   match /databases/{database}/documents {
-
-    /* ------------------------------------------------------------------
-     * Règles minimales indispensables (ex. users = self-access uniquement)
-     * ------------------------------------------------------------------ */
-    match /users/{userId} {
-      allow read, write: if isAuth() && request.auth.uid == userId;
-    }
-
-    /* ------------------------------------------------------------------
-     * Fallback “open for MVP” : tout document, toute collection
-     * ------------------------------------------------------------------ */
+    // TOUS les documents, toutes les collections
     match /{document=**} {
-      allow read, write: if isAuth();
+      allow read, write: if true;
     }
   }
 }

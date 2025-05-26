@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mvp_social_quest/core/providers/repository_providers.dart';
 import 'package:mvp_social_quest/models/partner.dart';
+import 'package:mvp_social_quest/models/quest.dart';
 
 /// Contrôleur pour créer, modifier, supprimer un partner,
 /// avec suppression en cascade de ses quests, slots et réductions.
@@ -34,6 +35,7 @@ class PartnerController extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final firestore = FirebaseFirestore.instance;
+      final questRepo = ref.read(questRepoProvider);
 
       // 1️⃣ Récupère toutes les quests du partner
       final questsSnap =
@@ -43,7 +45,8 @@ class PartnerController extends AsyncNotifier<void> {
               .get();
 
       for (final qDoc in questsSnap.docs) {
-        final questId = qDoc.id;
+        final quest = Quest.fromJson({'id': qDoc.id, ...?qDoc.data()});
+        final questId = quest.id;
 
         // 2️⃣ Récupère tous les slots globaux de la quest
         final slotQuery =
@@ -91,8 +94,8 @@ class PartnerController extends AsyncNotifier<void> {
           await slotDoc.reference.delete();
         }
 
-        // 7️⃣ Supprime la quest
-        await qDoc.reference.delete();
+        // 7️⃣ Supprime la quest + ses images via QuestRepository
+        await questRepo.deleteQuestWithPhotos(quest);
       }
 
       // 8️⃣ Supprime le partner lui-même

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart'
     show GoRouter, GoRoute, ShellRoute, GoRouterRefreshStream;
 
 import 'package:mvp_social_quest/core/providers/auth_provider.dart';
+import 'package:mvp_social_quest/screens/booking/partner_booking_detail_page.dart';
 import 'package:mvp_social_quest/screens/partners/partner_edit_page.dart';
 
 import '../providers/user_type_provider.dart';
@@ -30,9 +31,8 @@ import '../../screens/favorites/favorites_page.dart';
 import '../../screens/profile/profile_page.dart';
 import '../../screens/partners/partner_onboarding_page.dart';
 import '../../screens/partners/partner_dashboard_page.dart';
-import '../../screens/partners/partner_bookings_page.dart';
+import '../../screens/booking/partner_bookings_page.dart';
 import '../../screens/partners/partner_profile_page.dart';
-import '../../screens/partners/quest_form_page.dart';
 import '../../screens/partners/partner_slots_calendar_page.dart';
 import '../../screens/splash/splash_page.dart';
 
@@ -148,23 +148,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                       PartnerProfilePage(partnerId: st.pathParameters['pid']!),
                     ),
               ),
-              GoRoute(
-                path: 'quest/new',
-                pageBuilder:
-                    (_, st) => _fade(
-                      QuestFormPage(partnerId: st.pathParameters['pid']!),
-                    ),
-              ),
-              GoRoute(
-                path: 'quest/:qid/edit',
-                pageBuilder:
-                    (_, st) => _fade(
-                      QuestFormPage(
-                        partnerId: st.pathParameters['pid']!,
-                        existing: st.extra as Quest?,
-                      ),
-                    ),
-              ),
 
               GoRoute(
                 path: 'quest/:qid',
@@ -176,16 +159,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                     ),
                 routes: [
-                  GoRoute(
-                    path: 'edit',
-                    pageBuilder:
-                        (_, st) => _fade(
-                          QuestFormPage(
-                            partnerId: st.pathParameters['pid']!,
-                            existing: st.extra as Quest?,
-                          ),
-                        ),
-                  ),
                   GoRoute(
                     path: 'slots',
                     pageBuilder:
@@ -252,6 +225,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/dashboard/:pid/booking/:bid',
+        pageBuilder:
+            (_, st) => _fade(
+              PartnerBookingDetailsPage(bookingId: st.pathParameters['bid']!),
+            ),
+      ),
+      GoRoute(
         path: '/',
         pageBuilder: (_, __) => _fade(const AuthGate(child: SizedBox())),
       ),
@@ -287,6 +267,10 @@ class _UserShell extends StatelessWidget {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: idx,
         onTap: (i) => c.go(user_nav.userNavItems[i].path),
+        selectedItemColor: Theme.of(c).colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
         items: [
           for (final it in user_nav.userNavItems)
             BottomNavigationBarItem(icon: Icon(it.icon), label: it.label),

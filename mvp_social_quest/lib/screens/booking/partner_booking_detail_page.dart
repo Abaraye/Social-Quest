@@ -9,9 +9,9 @@ import '../../core/providers/quest_provider.dart';
 import '../../core/providers/service_provider.dart';
 import '../../widgets/common/async_value_widget.dart';
 
-class BookingDetailsPage extends ConsumerWidget {
+class PartnerBookingDetailsPage extends ConsumerWidget {
   final String bookingId;
-  const BookingDetailsPage({super.key, required this.bookingId});
+  const PartnerBookingDetailsPage({super.key, required this.bookingId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,28 +41,13 @@ class BookingDetailsPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (quest != null) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => QuestDetailPage(
-                                    partnerId: quest.partnerId,
-                                    questId: quest.id,
-                                  ),
-                            ),
-                          );
-                        }
-                      },
-                      child: Text(
-                        quest?.title ?? 'Activité inconnue',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.blue,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
+                    Text(
+                      quest?.title ?? 'Activité inconnue',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.copyWith(color: Colors.blue),
                     ),
+
                     const SizedBox(height: 16),
                     Text('📅 Date : $date'),
                     Text('👥 Personnes : ${b.peopleCount}'),
@@ -87,7 +72,6 @@ class BookingDetailsPage extends ConsumerWidget {
                             final bookingService = ref.read(
                               bookingServiceProvider,
                             );
-
                             final confirmed = await bookingService
                                 .cancelBookingWithConfirmation(
                                   context,
@@ -96,14 +80,14 @@ class BookingDetailsPage extends ConsumerWidget {
                                 );
 
                             if (confirmed && context.mounted) {
-                              Navigator.of(
-                                context,
-                              ).pop(); // Ferme BookingDetailsPage
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text("Réservation annulée."),
                                 ),
                               );
+                              Navigator.of(
+                                context,
+                              ).pop(); // ✅ ferme BookingDetailsPage
                             }
                           },
                           child: const Text("Annuler la réservation"),

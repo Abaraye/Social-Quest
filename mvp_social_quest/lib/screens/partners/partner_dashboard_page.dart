@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mvp_social_quest/core/providers/partner_provider.dart';
+import 'package:mvp_social_quest/core/providers/repository_providers.dart';
 import 'package:mvp_social_quest/core/state/partner_controller.dart';
 import 'package:mvp_social_quest/core/state/quest_controller.dart';
 import 'package:mvp_social_quest/widgets/common/async_value_widget.dart';
@@ -162,57 +163,59 @@ class PartnerDashboardPage extends ConsumerWidget {
                                                           Icons.delete_outline,
                                                         ),
                                                         tooltip: 'Supprimer',
-                                                        onPressed:
-                                                            () => showDialog<
-                                                              bool
-                                                            >(
-                                                              context: context,
-                                                              builder:
-                                                                  (
-                                                                    ctx,
-                                                                  ) => AlertDialog(
-                                                                    title: const Text(
-                                                                      'Supprimer cette activité ?',
-                                                                    ),
-                                                                    content:
-                                                                        const Text(
-                                                                          'Cette action est irréversible.',
-                                                                        ),
-                                                                    actions: [
-                                                                      TextButton(
-                                                                        onPressed:
-                                                                            () => Navigator.pop(
-                                                                              ctx,
-                                                                            ),
-                                                                        child: const Text(
-                                                                          'Annuler',
-                                                                        ),
-                                                                      ),
-                                                                      TextButton(
-                                                                        onPressed: () {
-                                                                          // Appel en cascade : supprime la quest  ses slots & réductions
-                                                                          ref
-                                                                              .read(
-                                                                                questControllerProvider.notifier,
-                                                                              )
-                                                                              .deleteCascade(
-                                                                                partnerId:
-                                                                                    p.id,
-                                                                                questId:
-                                                                                    q.id,
-                                                                              );
-                                                                          Navigator.pop(
-                                                                            ctx,
-                                                                          );
-                                                                        },
-
-                                                                        child: const Text(
-                                                                          'Supprimer',
-                                                                        ),
-                                                                      ),
-                                                                    ],
+                                                        onPressed: () async {
+                                                          final confirmed = await showDialog<
+                                                            bool
+                                                          >(
+                                                            context: context,
+                                                            builder:
+                                                                (
+                                                                  ctx,
+                                                                ) => AlertDialog(
+                                                                  title: const Text(
+                                                                    'Supprimer cette activité ?',
                                                                   ),
-                                                            ),
+                                                                  content:
+                                                                      const Text(
+                                                                        'Cette action est irréversible.',
+                                                                      ),
+                                                                  actions: [
+                                                                    TextButton(
+                                                                      onPressed:
+                                                                          () => Navigator.pop(
+                                                                            ctx,
+                                                                            false,
+                                                                          ),
+                                                                      child: const Text(
+                                                                        'Annuler',
+                                                                      ),
+                                                                    ),
+                                                                    TextButton(
+                                                                      onPressed:
+                                                                          () => Navigator.pop(
+                                                                            ctx,
+                                                                            true,
+                                                                          ),
+                                                                      child: const Text(
+                                                                        'Supprimer',
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                          );
+
+                                                          if (confirmed ==
+                                                              true) {
+                                                            final questRepo =
+                                                                ref.read(
+                                                                  questRepoProvider,
+                                                                );
+                                                            await questRepo
+                                                                .deleteQuestWithPhotos(
+                                                                  q,
+                                                                ); // ✅ supprime Firestore + images
+                                                          }
+                                                        },
                                                       ),
                                                     ],
                                                   ),

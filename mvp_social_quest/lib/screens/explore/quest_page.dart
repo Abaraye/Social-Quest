@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mvp_social_quest/widgets/quest_photo_carousel.dart';
 import '../../core/providers/quest_provider.dart';
 import '../../widgets/common/async_value_widget.dart';
 
@@ -21,8 +22,10 @@ class QuestPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  QuestPhotoCarousel(urls: q!.photos),
+                  const SizedBox(height: 16),
                   Text(
-                    q!.title,
+                    q.title,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 12),

@@ -52,6 +52,10 @@ class _PartnerSlotsCalendarPageState
             focusedDay: _focusedDay,
             calendarFormat: CalendarFormat.week,
             selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
+            eventLoader: (day) {
+              final normalized = DateTime(day.year, day.month, day.day);
+              return byDay[normalized] ?? [];
+            },
             onDaySelected: (rawSelected, focused) {
               final selected = DateTime(
                 rawSelected.year,
@@ -78,7 +82,6 @@ class _PartnerSlotsCalendarPageState
                     ),
               );
             },
-
             calendarStyle: const CalendarStyle(
               todayDecoration: BoxDecoration(
                 color: Colors.purpleAccent,

@@ -87,10 +87,6 @@ class _WelcomePageState extends State<WelcomePage>
                   onPressed: () => context.push('/login'),
                 ),
                 const SizedBox(height: 12),
-                TextButton(
-                  child: const Text("Continuer sans compte"),
-                  onPressed: () => context.go('/'),
-                ),
               ],
             ),
           ),

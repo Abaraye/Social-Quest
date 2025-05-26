@@ -9,3 +9,10 @@ final bookingListProvider = StreamProvider<List<Booking>>(
 final bookingProvider = FutureProvider.family<Booking?, String>(
   (ref, id) => ref.watch(bookingRepoProvider).fetch(id),
 );
+
+final partnerBookingListProvider = FutureProvider.family<List<Booking>, String>(
+  (ref, partnerId) async {
+    final repo = ref.read(bookingRepoProvider);
+    return repo.fetchByPartnerId(partnerId);
+  },
+);
