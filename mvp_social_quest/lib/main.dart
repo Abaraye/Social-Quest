@@ -1,54 +1,39 @@
-// lib/main.dart
-
-import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/routing/app_router.dart';
 
-import 'firebase_options.dart';
-import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart'; // contient routerProvider
-import 'screens/auth/auth_gate.dart';
-
-/// Initialise Firebase et la localisation
-Future<void> _bootstrap() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app') {
+      // rien à faire : l'app Firebase est déjà initialisée
+    } else {
+      rethrow;
+    }
+  }
+
   await initializeDateFormatting('fr_FR', null);
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-void main() {
-  runZonedGuarded(
-    () async {
-      await _bootstrap();
-      // ProviderScope pour Riverpod (providers définis dans app_router)
-      runApp(const ProviderScope(child: MyApp()));
-    },
-    (error, stack) {
-      // Gestion des erreurs non capturées
-      debugPrint('Uncaught zone error: \$error');
-    },
-  );
-}
-
-/// Point d'entrée de l'application
-/// Utilise ConsumerWidget pour accéder aux providers Riverpod
 class MyApp extends ConsumerWidget {
-  const MyApp({Key? key}) : super(key: key);
-
+  const MyApp({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Récupère le router configuré via routerProvider
     final goRouter = ref.watch(routerProvider);
-
     return MaterialApp.router(
       title: 'Social Quest',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      routerConfig: goRouter,
       locale: const Locale('fr', 'FR'),
       supportedLocales: const [Locale('fr', 'FR')],
       localizationsDelegates: const [
@@ -56,10 +41,7 @@ class MyApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-
-      /// AuthGate vérifie l'état d'authentification avant d'afficher l'app
-      builder: (context, child) => AuthGate(child: child!),
-      routerConfig: goRouter,
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
     );
   }
 }

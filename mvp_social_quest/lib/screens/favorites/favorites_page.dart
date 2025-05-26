@@ -1,60 +1,69 @@
-// lib/screens/favorites/favorites_page.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
+import '../../core/providers/user_provider.dart';
+import '../../core/providers/quest_provider.dart';
+import '../../core/providers/service_provider.dart';
+import '../../screens/explore/quest_detail_page.dart';
+import '../../widgets/common/async_value_widget.dart';
+import '../../widgets/common/quest_card.dart';
 
-class FavoritesPage extends StatelessWidget {
-  const FavoritesPage({Key? key}) : super(key: key);
+class FavoritesPage extends ConsumerWidget {
+  const FavoritesPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
-      builder: (_, userSnap) {
-        if (!userSnap.hasData)
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        final favs = List<String>.from(userSnap.data!['favorites'] ?? []);
-        if (favs.isEmpty)
-          return const Scaffold(body: Center(child: Text('Aucun favori')));
-        final q =
-            FirebaseFirestore.instance
-                .collection('quests')
-                .where(FieldPath.documentId, whereIn: favs)
-                .snapshots();
-        return Scaffold(
-          appBar: AppBar(title: const Text('Favoris')),
-          body: StreamBuilder<QuerySnapshot>(
-            stream: q,
-            builder: (_, snap) {
-              if (!snap.hasData)
-                return const Center(child: CircularProgressIndicator());
-              return ListView(
-                children:
-                    snap.data!.docs.map((d) {
-                      return ListTile(
-                        title: Text(d['title']),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.favorite, color: Colors.red),
-                          onPressed: () {
-                            favs.remove(d.id);
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(uid)
-                                .update({'favorites': favs});
-                          },
-                        ),
-                        onTap: () => context.go('/quest/${d.id}'),
-                      );
-                    }).toList(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favAsync = ref.watch(favoriteIdsProvider);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mes favoris'),
+        automaticallyImplyLeading: false,
+      ),
+      body: favAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text("Erreur : $e")),
+        data: (favIds) {
+          if (favIds.isEmpty) {
+            return const Center(child: Text("Aucun favori."));
+          }
+
+          return ListView.builder(
+            itemCount: favIds.length,
+            itemBuilder: (_, i) {
+              final questAsync = ref.watch(questProvider(favIds[i]));
+              return AsyncValueWidget(
+                value: questAsync,
+                dataBuilder:
+                    (quest) => QuestCard(
+                      quest: quest!,
+                      isFavorite: true,
+                      onFavoriteToggle:
+                          userId == null
+                              ? null
+                              : () async {
+                                await ref
+                                    .read(favoriteServiceProvider)
+                                    .toggleFavorite(userId, quest.id, true);
+                              },
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder:
+                                (_) => QuestDetailPage(
+                                  partnerId: quest.partnerId,
+                                  questId: quest.id,
+                                ),
+                          ),
+                        );
+                      },
+                    ),
               );
             },
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
